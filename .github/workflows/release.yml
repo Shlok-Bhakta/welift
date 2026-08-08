@@ -98,14 +98,33 @@ jobs:
         working-directory: ios
         run: |
           set -euo pipefail
-          SCHEME=$(xcodebuild -workspace WeLift.xcworkspace -list | awk '/Schemes/{f=1;next}/^$/{f=0}f' | head -n1 | xargs)
-          echo "Using scheme: $SCHEME"
+          WORKSPACE=$(ls -1 *.xcworkspace | head -n1)
+          # Prefer the app scheme — never a Pods scheme like BVLinearGradient
+          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list \
+            | awk '/Schemes/{f=1;next}/^$/{f=0}f' \
+            | sed 's/^[[:space:]]*//' \
+            | grep -E '^(WeLift|welift|WeLift)$' \
+            | head -n1 || true)
+          if [[ -z "${SCHEME:-}" ]]; then
+            SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list \
+              | awk '/Schemes/{f=1;next}/^$/{f=0}f' \
+              | sed 's/^[[:space:]]*//' \
+              | grep -viE 'Pods|Tests|Gradient|BV|Expo' \
+              | head -n1 || true)
+          fi
+          if [[ -z "${SCHEME:-}" ]]; then
+            SCHEME="WeLift"
+          fi
+          echo "Workspace: $WORKSPACE"
+          echo "Scheme: $SCHEME"
+          xcodebuild -workspace "$WORKSPACE" -list
           xcodebuild \
-            -workspace WeLift.xcworkspace \
+            -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
             -configuration Release \
             -sdk iphoneos \
-            -derivedDataPath build \
+            -derivedDataPath "$PWD/build" \
+            -destination 'generic/platform=iOS' \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -115,12 +134,28 @@ jobs:
       - name: Package unsigned IPA
         run: |
           set -euo pipefail
-          mkdir -p dist Payload
-          APP=$(find ios/build -type d -name "*.app" | head -n 1)
+          mkdir -p dist
+          echo "Looking for .app under ios/build..."
+          find ios/build -type d -name "*.app" -print || true
+          APP=$(find ios/build/Build/Products -type d -name "*.app" | head -n 1 || true)
+          if [[ -z "${APP:-}" ]]; then
+            APP=$(find ios/build -type d -name "*.app" | head -n 1 || true)
+          fi
+          if [[ -z "${APP:-}" ]]; then
+            echo "No .app product found"
+            exit 1
+          fi
           echo "Found app: $APP"
-          cp -R "$APP" Payload/
-          zip -qry dist/welift-ios-unsigned.ipa Payload
-          ls -lh dist/
+          rm -rf Payload
+          mkdir Payload
+          cp -R "$APP" "Payload/$(basename "$APP")"
+          (
+            cd "$(pwd)"
+            zip -qry dist/welift-ios-unsigned.ipa Payload
+          )
+          rm -rf Payload
+          ls -lh dist/welift-ios-unsigned.ipa
+          unzip -l dist/welift-ios-unsigned.ipa | head -n 20
 
       - uses: actions/upload-artifact@v4
         with:
