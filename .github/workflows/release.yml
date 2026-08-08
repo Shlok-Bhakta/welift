@@ -98,25 +98,15 @@ jobs:
         working-directory: ios
         run: |
           set -euo pipefail
-          WORKSPACE=$(ls -1 *.xcworkspace | head -n1)
-          # Prefer the app scheme — never a Pods scheme like BVLinearGradient
-          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list \
-            | awk '/Schemes/{f=1;next}/^$/{f=0}f' \
-            | sed 's/^[[:space:]]*//' \
-            | grep -E '^(WeLift|welift|WeLift)$' \
-            | head -n1 || true)
-          if [[ -z "${SCHEME:-}" ]]; then
-            SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list \
-              | awk '/Schemes/{f=1;next}/^$/{f=0}f' \
-              | sed 's/^[[:space:]]*//' \
-              | grep -viE 'Pods|Tests|Gradient|BV|Expo' \
-              | head -n1 || true)
+          # .xcworkspace is a directory bundle — use -d so we don't list its guts
+          WORKSPACE=$(ls -d *.xcworkspace 2>/dev/null | head -n1)
+          if [[ -z "${WORKSPACE:-}" || ! -d "$WORKSPACE" ]]; then
+            WORKSPACE="WeLift.xcworkspace"
           fi
-          if [[ -z "${SCHEME:-}" ]]; then
-            SCHEME="WeLift"
-          fi
+          SCHEME="WeLift"
           echo "Workspace: $WORKSPACE"
           echo "Scheme: $SCHEME"
+          ls -la
           xcodebuild -workspace "$WORKSPACE" -list
           xcodebuild \
             -workspace "$WORKSPACE" \
