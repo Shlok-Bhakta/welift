@@ -28,8 +28,10 @@ npm run ios
 
 ## Releases
 
-Tag a version (`v1.0.0`) or run the **Release builds** GitHub Action.
+Run the **Unsigned builds** GitHub Action (workflow dispatch or `v*` tag).
 
-Requires repo secret `EXPO_TOKEN` and a real EAS project id in `app.json` → `extra.eas.projectId` (replace the placeholder after `eas init`).
+Artifacts (attached to a GitHub Release):
+- `welift-android.apk` — debug-signed release APK (sideloadable, no Play keystore)
+- `welift-ios-unsigned.ipa` — unsigned device IPA (not installable on stock iOS without signing)
 
-Builds iOS + Android with EAS and attaches artifacts to the GitHub Release.
+No Expo/`EXPO_TOKEN` required for that workflow.

@@ -1,33 +1,85 @@
-name: Release builds
+name: Unsigned builds
 
 on:
   push:
     tags:
       - "v*"
   workflow_dispatch:
-    inputs:
-      profile:
-        description: "EAS build profile"
-        required: true
-        default: "preview"
-        type: choice
-        options:
-          - preview
-          - production
 
 permissions:
   contents: write
 
 jobs:
-  build:
-    name: EAS build + GitHub Release
+  android:
+    name: Android APK
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Prebuild Android
+        run: npx expo prebuild --platform android --non-interactive --clean
+
+      - name: Build APK (debug-signed, no Play keystore)
+        working-directory: android
+        run: |
+          set -euo pipefail
+          # Point release at the debug keystore so we get a release APK without secrets
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("app/build.gradle")
+          text = p.read_text()
+          if "signingConfig signingConfigs.debug" not in text:
+              text = text.replace(
+                  "buildTypes {",
+                  "buildTypes {\n        // CI: unsigned/dev-friendly APK\n",
+                  1,
+              )
+              text = text.replace(
+                  "release {\n",
+                  "release {\n            signingConfig signingConfigs.debug\n",
+                  1,
+              )
+              p.write_text(text)
+          PY
+          ./gradlew :app:assembleRelease
+
+      - name: Collect APK
+        run: |
+          mkdir -p dist
+          APK=$(find android/app/build/outputs/apk -type f -name "*.apk" | head -n 1)
+          echo "Found: $APK"
+          cp "$APK" dist/welift-android.apk
+          ls -lh dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: welift-android-apk
+          path: dist/welift-android.apk
+          if-no-files-found: error
+
+  ios:
+    name: iOS unsigned IPA
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
@@ -35,83 +87,79 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Setup Expo / EAS
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Prebuild iOS
+        run: npx expo prebuild --platform ios --non-interactive --clean
 
-      - name: Typecheck
-        run: npx tsc --noEmit
+      - name: Install CocoaPods
+        working-directory: ios
+        run: pod install
 
-      - name: Resolve profile
-        id: meta
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "profile=${{ inputs.profile }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "profile=production" >> "$GITHUB_OUTPUT"
-          fi
-          echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-
-      - name: EAS build (iOS + Android)
-        run: |
-          eas build \
-            --platform all \
-            --profile "${{ steps.meta.outputs.profile }}" \
-            --non-interactive \
-            --no-wait \
-            --json > eas-build.json
-          cat eas-build.json
-
-      - name: Wait for builds & download artifacts
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      - name: Build unsigned iOS app
+        working-directory: ios
         run: |
           set -euo pipefail
-          # Poll until all builds finish, then download
-          python3 - <<'PY'
-          import json, subprocess, time, sys
-          builds = json.load(open("eas-build.json"))
-          if isinstance(builds, dict):
-              builds = [builds]
-          ids = [b["id"] for b in builds]
-          print("build ids:", ids)
-          deadline = time.time() + 60 * 50
-          while time.time() < deadline:
-              done = True
-              for bid in ids:
-                  out = subprocess.check_output(
-                      ["eas", "build:view", bid, "--json"], text=True
-                  )
-                  info = json.loads(out)
-                  status = info.get("status")
-                  print(bid, status)
-                  if status not in ("finished", "errored", "canceled"):
-                      done = False
-                  elif status != "finished":
-                      sys.exit(f"Build {bid} ended with {status}")
-              if done:
-                  break
-              time.sleep(45)
-          else:
-              sys.exit("Timed out waiting for EAS builds")
-          for bid in ids:
-              subprocess.check_call(
-                  ["eas", "build:download", "--id", bid, "--output", f"./artifacts-{bid}"]
-              )
-          PY
-          mkdir -p release-assets
-          find . -maxdepth 2 -type f \( -name "*.ipa" -o -name "*.apk" -o -name "*.aab" \) -exec cp {} release-assets/ \;
-          ls -la release-assets || true
+          SCHEME=$(xcodebuild -workspace WeLift.xcworkspace -list | awk '/Schemes/{f=1;next}/^$/{f=0}f' | head -n1 | xargs)
+          echo "Using scheme: $SCHEME"
+          xcodebuild \
+            -workspace WeLift.xcworkspace \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            ONLY_ACTIVE_ARCH=NO \
+            build
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Package unsigned IPA
+        run: |
+          set -euo pipefail
+          mkdir -p dist Payload
+          APP=$(find ios/build -type d -name "*.app" | head -n 1)
+          echo "Found app: $APP"
+          cp -R "$APP" Payload/
+          zip -qry dist/welift-ios-unsigned.ipa Payload
+          ls -lh dist/
+
+      - uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ steps.meta.outputs.tag || github.ref_name }}
-          name: WeLift ${{ steps.meta.outputs.tag || github.ref_name }}
+          name: welift-ios-ipa
+          path: dist/welift-ios-unsigned.ipa
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: [android, ios]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Stage assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f \( -name "*.apk" -o -name "*.ipa" \) -exec cp {} release-assets/ \;
+          ls -lh release-assets
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=build-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: WeLift ${{ steps.tag.outputs.name }}
           generate_release_notes: true
-          files: |
-            release-assets/*
+          files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
