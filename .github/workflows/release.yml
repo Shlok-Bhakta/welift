@@ -32,6 +32,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Test
+        run: npm run test:coverage
+
       - name: Prebuild Android
         run: npx expo prebuild --platform android --non-interactive --clean
 
@@ -75,7 +78,8 @@ jobs:
 
   ios:
     name: iOS unsigned IPA
-    runs-on: macos-15
+    # macos-26 / Xcode 26+ required for expo-glass-effect (Swift tools 6.2)
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 
@@ -83,6 +87,25 @@ jobs:
         with:
           node-version: 22
           cache: npm
+
+      - name: Select Xcode 26+
+        run: |
+          set -euo pipefail
+          ls /Applications | grep -E '^Xcode' || true
+          for c in \
+            /Applications/Xcode_26.6.app \
+            /Applications/Xcode_26.5.app \
+            /Applications/Xcode_26.4.1.app \
+            /Applications/Xcode_swift_6.2.app \
+            /Applications/Xcode.app
+          do
+            if [[ -d "$c" ]]; then
+              sudo xcode-select -s "$c/Contents/Developer"
+              break
+            fi
+          done
+          xcodebuild -version
+          swift --version
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
