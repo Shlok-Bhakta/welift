@@ -1,25 +1,96 @@
 {
   "expo": {
-    "name": "MB-LiftLog",
-    "slug": "MB-LiftLog",
+    "name": "WeLift",
+    "slug": "welift",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "scheme": "welift",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#141210"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "us.shloklab.welift",
+      "buildNumber": "1",
+      "infoPlist": {
+        "UIDesignRequiresCompatibility": false,
+        "CFBundleDocumentTypes": [
+          {
+            "CFBundleTypeName": "WeLift Bundle",
+            "CFBundleTypeRole": "Editor",
+            "LSItemContentTypes": ["us.shloklab.welift.bundle", "public.json"]
+          }
+        ],
+        "UTExportedTypeDeclarations": [
+          {
+            "UTTypeIdentifier": "us.shloklab.welift.bundle",
+            "UTTypeDescription": "WeLift Bundle",
+            "UTTypeConformsTo": ["public.json", "public.data"],
+            "UTTypeTagSpecification": {
+              "public.filename-extension": ["welift"],
+              "public.mime-type": ["application/json"]
+            }
+          }
+        ],
+        "LSSupportsOpeningDocumentsInPlace": true,
+        "UIFileSharingEnabled": true
+      },
+      "associatedDomains": []
     },
     "android": {
+      "package": "us.shloklab.welift",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#141210",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": true,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [
+            {
+              "scheme": "content",
+              "mimeType": "application/json"
+            },
+            {
+              "scheme": "file",
+              "mimeType": "application/json",
+              "pathPattern": ".*\\.welift"
+            },
+            {
+              "scheme": "content",
+              "pathPattern": ".*\\.welift"
+            }
+          ]
+        }
+      ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-sharing",
+      [
+        "expo-system-ui",
+        {
+          "userInterfaceStyle": "dark"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
     }
   }
 }
