@@ -1,0 +1,117 @@
+name: Release builds
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "EAS build profile"
+        required: true
+        default: "preview"
+        type: choice
+        options:
+          - preview
+          - production
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: EAS build + GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Setup Expo / EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Resolve profile
+        id: meta
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "profile=${{ inputs.profile }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "profile=production" >> "$GITHUB_OUTPUT"
+          fi
+          echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: EAS build (iOS + Android)
+        run: |
+          eas build \
+            --platform all \
+            --profile "${{ steps.meta.outputs.profile }}" \
+            --non-interactive \
+            --no-wait \
+            --json > eas-build.json
+          cat eas-build.json
+
+      - name: Wait for builds & download artifacts
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Poll until all builds finish, then download
+          python3 - <<'PY'
+          import json, subprocess, time, sys
+          builds = json.load(open("eas-build.json"))
+          if isinstance(builds, dict):
+              builds = [builds]
+          ids = [b["id"] for b in builds]
+          print("build ids:", ids)
+          deadline = time.time() + 60 * 50
+          while time.time() < deadline:
+              done = True
+              for bid in ids:
+                  out = subprocess.check_output(
+                      ["eas", "build:view", bid, "--json"], text=True
+                  )
+                  info = json.loads(out)
+                  status = info.get("status")
+                  print(bid, status)
+                  if status not in ("finished", "errored", "canceled"):
+                      done = False
+                  elif status != "finished":
+                      sys.exit(f"Build {bid} ended with {status}")
+              if done:
+                  break
+              time.sleep(45)
+          else:
+              sys.exit("Timed out waiting for EAS builds")
+          for bid in ids:
+              subprocess.check_call(
+                  ["eas", "build:download", "--id", bid, "--output", f"./artifacts-{bid}"]
+              )
+          PY
+          mkdir -p release-assets
+          find . -maxdepth 2 -type f \( -name "*.ipa" -o -name "*.apk" -o -name "*.aab" \) -exec cp {} release-assets/ \;
+          ls -la release-assets || true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag || github.ref_name }}
+          name: WeLift ${{ steps.meta.outputs.tag || github.ref_name }}
+          generate_release_notes: true
+          files: |
+            release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
