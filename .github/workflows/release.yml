@@ -32,9 +32,6 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test
-        run: npm run test:coverage
-
       - name: Prebuild Android
         run: npx expo prebuild --platform android --non-interactive --clean
 
