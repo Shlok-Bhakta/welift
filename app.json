@@ -45,6 +45,7 @@
     "android": {
       "package": "us.shloklab.welift",
       "versionCode": 1,
+      "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "backgroundColor": "#141210",
         "foregroundImage": "./assets/android-icon-foreground.png",

@@ -18,6 +18,18 @@ npm install --legacy-peer-deps
 npm run ios
 ```
 
+## Story acceptance
+
+Feature work follows the Music Tools issue-to-PR loop: implement with tests, prove the visible path with Maestro, record a short simulator demo, upload it to Planista, and attach the permalink on the PR.
+
+```bash
+npm run validate
+npm run ios:e2e          # writes artifacts/e2e-demo.mp4
+scripts/upload-demo.sh artifacts/e2e-demo.mp4
+```
+
+Agent skills live in `.agents/skills/demo-ios-story` and `skills/record-ios-demo`. Pull requests also get an automated iOS preview comment from `.github/workflows/ios-preview.yml`.
+
 ## Data
 
 - Device UUID + display name on first launch
