@@ -10,16 +10,20 @@ name: Onboard name stays above keyboard
 - assertVisible: "Enter your name"
 - assertVisible: "Next"
 - startRecording: e2e-demo-raw
+- waitForAnimationToEnd
 - tapOn:
     id: "onboard-name"
+- waitForAnimationToEnd
 - assertVisible:
     id: "onboard-name"
 - assertVisible: "Next"
 - eraseText
 - inputText: "Demo"
+- waitForAnimationToEnd
 - tapOn: "Next"
 - extendedWaitUntil:
     visible: "Your week"
     timeout: 15000
 - assertVisible: "Demo"
+- waitForAnimationToEnd
 - stopRecording

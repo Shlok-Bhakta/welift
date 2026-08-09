@@ -46,7 +46,6 @@ export default function OnboardScreen() {
             testID="onboard-name"
             autoCapitalize="words"
             autoCorrect={false}
-            autoFocus
             returnKeyType="done"
             onSubmitEditing={openWeek}
           />
