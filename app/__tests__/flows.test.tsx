@@ -3,7 +3,7 @@ import { Alert } from "react-native";
 
 import { dayKey } from "../../src/lib/format";
 import * as share from "../../src/lib/share";
-import { useWelift } from "../../src/store/welift";
+import { useWelift, exerciseDaySeries } from "../../src/store/welift";
 import {
   mockRouter,
   prepareFlow,
@@ -168,6 +168,12 @@ describe("screen flows (E2E-lite)", () => {
     expect(screen.getByText("Progress")).toBeTruthy();
     expect(screen.getByTestId("progress-chart")).toBeTruthy();
     expect(screen.getByText(/158 lb/)).toBeTruthy();
+    const meId = useWelift.getState().meId!;
+    expect(
+      exerciseDaySeries(meId, "mint-chart-lift", "weight").filter(
+        (p) => p.value > 0
+      )
+    ).toHaveLength(1);
   });
 
   it("full happy path: onboard → log → save → day has the lift", () => {

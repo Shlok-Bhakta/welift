@@ -39,11 +39,13 @@ export default function ProgressScreen() {
   const series = useMemo(
     () =>
       Object.values(profiles).map((p) => {
-        const points = exerciseDaySeries(p.id, exercise, mode).map((pt) => ({
-          value: pt.value,
-          label: pt.label,
-        }));
-        const peak = Math.max(0, ...points.map((pt) => pt.value));
+        const points = exerciseDaySeries(p.id, exercise, mode)
+          .filter((pt) => pt.value > 0)
+          .map((pt) => ({
+            value: pt.value,
+            label: pt.label,
+          }));
+        const peak = points.length ? Math.max(...points.map((pt) => pt.value)) : 0;
         return {
           id: p.id,
           name: p.name,
@@ -56,7 +58,8 @@ export default function ProgressScreen() {
     [profiles, exercise, mode, meId]
   );
 
-  const hasLoggedData = series.some((s) => s.peak > 0);
+  const plotted = series.filter((s) => s.points.length > 0);
+  const hasLoggedData = plotted.length > 0;
 
   return (
     <Screen>
@@ -104,13 +107,11 @@ export default function ProgressScreen() {
             <Muted testID="progress-empty">
               Log this exercise to see your rolling week.
             </Muted>
-          ) : series[0] ? (
+          ) : plotted[0] ? (
             Platform.OS === "web" ? (
               // gifted-charts LineChart currently throws on RN-web; keep a readable fallback.
               <View style={styles.webChart} testID="progress-web-chart">
-                {series
-                  .filter((s) => s.peak > 0)
-                  .map((s) => (
+                {plotted.map((s) => (
                   <View key={s.id} style={styles.webSeries}>
                     <Muted>
                       {s.name}
@@ -125,11 +126,8 @@ export default function ProgressScreen() {
                             style={[
                               styles.webBar,
                               {
-                                height: pt.value
-                                  ? 8 + (pt.value / max) * 72
-                                  : 4,
+                                height: 8 + (pt.value / max) * 72,
                                 backgroundColor: s.color,
-                                opacity: pt.value ? 0.9 : 0.25,
                               },
                             ]}
                           />
@@ -141,20 +139,17 @@ export default function ProgressScreen() {
               </View>
             ) : (
               <LineChart
-                data={series.find((s) => s.peak > 0)?.points ?? series[0].points}
-                data2={
-                  series.filter((s) => s.peak > 0)[1]?.points ??
-                  series[1]?.points
-                }
-                color={series[0].color}
-                color2={series[1]?.color}
+                data={plotted[0].points}
+                data2={plotted[1]?.points}
+                color={plotted[0].color}
+                color2={plotted[1]?.color}
                 thickness={2}
                 thickness2={2}
                 hideDataPoints={false}
-                dataPointsColor={series[0].color}
-                dataPointsColor2={series[1]?.color}
-                dataPointsRadius={3}
-                curved
+                dataPointsColor={plotted[0].color}
+                dataPointsColor2={plotted[1]?.color}
+                dataPointsRadius={4}
+                curved={false}
                 areaChart={false}
                 yAxisColor={colors.line}
                 xAxisColor={colors.line}
@@ -173,9 +168,7 @@ export default function ProgressScreen() {
         <Mini style={{ marginTop: 12 }}>
           {mode === "time" ? "Best minutes" : "Best est. 1RM"}
         </Mini>
-        {series
-          .filter((s) => s.peak > 0)
-          .map((s) => (
+        {plotted.map((s) => (
           <View key={s.id} style={styles.person}>
             <View style={styles.av}>
               <Body style={{ fontSize: 12 }}>{initials(s.name)}</Body>
