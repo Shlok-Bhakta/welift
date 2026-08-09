@@ -7,16 +7,17 @@ name: Onboard name stays above keyboard
     visible:
       id: "onboard-name"
     timeout: 30000
-- assertVisible: "Open my week"
+- assertVisible: "Enter your name"
+- assertVisible: "Next"
 - startRecording: e2e-demo-raw
 - tapOn:
     id: "onboard-name"
 - assertVisible:
     id: "onboard-name"
-- assertVisible: "Open my week"
+- assertVisible: "Next"
 - eraseText
 - inputText: "Demo"
-- tapOn: "done"
+- tapOn: "Next"
 - extendedWaitUntil:
     visible: "Your week"
     timeout: 15000

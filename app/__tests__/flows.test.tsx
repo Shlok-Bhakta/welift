@@ -44,14 +44,15 @@ describe("screen flows (E2E-lite)", () => {
 
   it("onboard rejects empty name and opens week with a profile", () => {
     render(<OnboardScreen />);
-    expect(screen.getByText("Open my week")).toBeTruthy();
+    expect(screen.getByText("Enter your name")).toBeTruthy();
+    expect(screen.getByText("Next")).toBeTruthy();
 
-    fireEvent.press(screen.getByText("Open my week"));
+    fireEvent.press(screen.getByText("Next"));
     expect(useWelift.getState().meId).toBeNull();
     expect(mockRouter.replace).not.toHaveBeenCalled();
 
-    fireEvent.changeText(screen.getByPlaceholderText("Shlok"), "  Shlok  ");
-    fireEvent.press(screen.getByText("Open my week"));
+    fireEvent.changeText(screen.getByPlaceholderText("Name"), "  Shlok  ");
+    fireEvent.press(screen.getByText("Next"));
 
     expect(useWelift.getState().me()?.name).toBe("Shlok");
     expect(mockRouter.replace).toHaveBeenCalledWith("/week");
@@ -163,8 +164,8 @@ describe("screen flows (E2E-lite)", () => {
 
   it("full happy path: onboard → log → save → day has the lift", () => {
     render(<OnboardScreen />);
-    fireEvent.changeText(screen.getByPlaceholderText("Shlok"), "Shlok");
-    fireEvent.press(screen.getByText("Open my week"));
+    fireEvent.changeText(screen.getByPlaceholderText("Name"), "Shlok");
+    fireEvent.press(screen.getByText("Next"));
 
     const day = dayKey(new Date());
     useWelift.getState().openDay(day);

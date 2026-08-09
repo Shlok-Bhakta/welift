@@ -8,13 +8,13 @@ test.describe("WeLift web smoke", () => {
   test("onboard → week → log a set → save", async ({ page }) => {
     await page.goto("/");
 
-    await expect(page.getByText("Open my week")).toBeVisible({
+    await expect(page.getByText("Enter your name")).toBeVisible({
       timeout: 60_000,
     });
-    await expect(page.getByText(/Chalk warmth/i)).toBeVisible();
+    await expect(page.getByText("Next")).toBeVisible();
 
-    await page.getByPlaceholder("Shlok").fill("Shlok");
-    await page.getByText("Open my week").click();
+    await page.getByPlaceholder("Name").fill("Shlok");
+    await page.getByText("Next").click();
 
     await expect(page.getByText("Your week").first()).toBeVisible({
       timeout: 30_000,
@@ -53,11 +53,11 @@ test.describe("WeLift web smoke", () => {
 
   test("menu opens people & progress", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("Open my week")).toBeVisible({
+    await expect(page.getByText("Enter your name")).toBeVisible({
       timeout: 60_000,
     });
-    await page.getByPlaceholder("Shlok").fill("Web QA");
-    await page.getByText("Open my week").click();
+    await page.getByPlaceholder("Name").fill("Web QA");
+    await page.getByText("Next").click();
     await expect(page.getByText("Your week").first()).toBeVisible({
       timeout: 30_000,
     });
