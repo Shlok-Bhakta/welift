@@ -52,9 +52,15 @@ export function Mini({ style, ...rest }: TextProps) {
   return <Text style={[styles.mini, style]} {...rest} />;
 }
 
-export function Pill({ children }: { children: React.ReactNode }) {
+export function Pill({
+  children,
+  testID,
+}: {
+  children: React.ReactNode;
+  testID?: string;
+}) {
   return (
-    <View style={styles.pill}>
+    <View style={styles.pill} testID={testID}>
       <Text style={styles.pillText}>{children}</Text>
     </View>
   );

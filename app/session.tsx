@@ -25,7 +25,7 @@ import {
   Pill,
   Screen,
 } from "../src/components/ui";
-import { COMMON_EXERCISES } from "../src/lib/exercises";
+import { COMMON_EXERCISES, commonMode } from "../src/lib/exercises";
 import { fmtDuration, slugify } from "../src/lib/format";
 import { useWelift } from "../src/store/welift";
 import type { ExerciseMode } from "../src/types";
@@ -125,6 +125,7 @@ export default function SessionScreen() {
             </View>
             <Button
               label="Save"
+              testID="session-save"
               small
               onPress={() => {
                 saveDraft();
@@ -147,14 +148,28 @@ export default function SessionScreen() {
 
           <Button
             label="Add exercise"
+            testID="add-exercise"
             style={{ marginTop: 14, marginBottom: 8 }}
             onPress={() => sheetRef.current?.present()}
           />
 
           {draft.exercises.length === 0 ? (
-            <Muted style={{ marginTop: 8 }}>
-              No exercises yet. Add one to start logging sets.
-            </Muted>
+            <View style={{ marginTop: 8, gap: 8 }}>
+              <Muted>No exercises yet. Add one to start logging sets.</Muted>
+              <Mini>Quick add</Mini>
+              {["Deadlift", "Squat", "Bench Press"].map((name) => {
+                const key = slugify(name);
+                return (
+                  <Button
+                    key={key}
+                    label={name}
+                    variant="line"
+                    testID={`quick-add-${key}`}
+                    onPress={() => addExercise(name, commonMode(key))}
+                  />
+                );
+              })}
+            </View>
           ) : (
             draft.exercises.map((e) => (
               <View key={e.key} style={styles.exblock}>
@@ -329,6 +344,7 @@ export default function SessionScreen() {
               value={query}
               onChangeText={setQuery}
               placeholder="Search or create…"
+              testID="exercise-search"
               style={{ marginVertical: 10 }}
             />
             <Mini>Default style for new lifts</Mini>
@@ -456,7 +472,11 @@ function ExerciseRow({
   onPress: () => void;
 }) {
   return (
-    <Pressable onPress={onPress} style={styles.exRow}>
+    <Pressable
+      onPress={onPress}
+      style={styles.exRow}
+      testID={`exercise-row-${meta}`}
+    >
       <View style={{ flex: 1 }}>
         <Body>{name}</Body>
         <Muted>{meta}</Muted>

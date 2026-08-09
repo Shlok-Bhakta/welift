@@ -1,29 +1,69 @@
 appId: us.shloklab.welift
-name: Onboard name stays above keyboard
+name: Mint install and real progress chart
 ---
 - launchApp:
     clearState: true
+- tapOn:
+    text: "Cancel"
+    optional: true
 - extendedWaitUntil:
     visible:
       id: "onboard-name"
     timeout: 30000
 - assertVisible: "Enter your name"
-- assertVisible: "Next"
+- assertNotVisible: "Alex"
 - startRecording: e2e-demo-raw
 - waitForAnimationToEnd
 - tapOn:
     id: "onboard-name"
-- waitForAnimationToEnd
-- assertVisible:
-    id: "onboard-name"
-- assertVisible: "Next"
 - eraseText
 - inputText: "Demo"
-- waitForAnimationToEnd
 - tapOn: "Next"
 - extendedWaitUntil:
     visible: "Your week"
     timeout: 15000
 - assertVisible: "Demo"
+- assertNotVisible: "Alex"
+- scrollUntilVisible:
+    element:
+      id: "week-empty-day"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "week-empty-day"
+- extendedWaitUntil:
+    visible:
+      id: "quick-add-deadlift"
+    timeout: 15000
+- tapOn:
+    id: "quick-add-deadlift"
+- extendedWaitUntil:
+    visible: "Deadlift"
+    timeout: 10000
+- tapOn:
+    id: "session-save"
+- extendedWaitUntil:
+    visible: "Your week"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "week-active-pill"
+    direction: DOWN
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "week-menu"
+    direction: UP
+    timeout: 10000
+- openLink: welift:///progress
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "progress-heading"
+    timeout: 15000
+- tapOn: "Deadlift"
+- assertVisible: "158 lb"
 - waitForAnimationToEnd
 - stopRecording

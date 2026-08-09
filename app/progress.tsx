@@ -14,7 +14,7 @@ import {
 } from "../src/components/ui";
 import { COMMON_EXERCISES } from "../src/lib/exercises";
 import { initials, slugify } from "../src/lib/format";
-import { bestMetric, useWelift } from "../src/store/welift";
+import { exerciseDaySeries, useWelift } from "../src/store/welift";
 import { colors } from "../src/theme";
 
 export default function ProgressScreen() {
@@ -22,7 +22,6 @@ export default function ProgressScreen() {
   const profiles = useWelift((s) => s.profiles);
   const meId = useWelift((s) => s.meId);
   const knownMode = useWelift((s) => s.knownMode);
-  const [exercise, setExercise] = useState("deadlift");
 
   const keys = useMemo(() => {
     const map = new Map(COMMON_EXERCISES.map((c) => [slugify(c.name), c.name]));
@@ -34,26 +33,30 @@ export default function ProgressScreen() {
     return [...map.entries()];
   }, [profiles]);
 
+  const [exercise, setExercise] = useState(keys[0]?.[0] ?? "deadlift");
   const mode = knownMode(exercise);
-  const labels = [5, 4, 3, 2, 1, 0].map((i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - i * 3);
-    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  });
 
-  const series = Object.values(profiles).map((p) => {
-    const best = bestMetric(p.id, exercise, mode) || (mode === "time" ? 20 : 200);
-    return {
-      id: p.id,
-      name: p.name,
-      you: p.id === meId,
-      color: p.id === meId ? colors.accent : colors.them,
-      points: labels.map((_, i) => ({
-        value: Math.round(best * (0.84 + i * 0.03)),
-        label: labels[i],
-      })),
-    };
-  });
+  const series = useMemo(
+    () =>
+      Object.values(profiles).map((p) => {
+        const points = exerciseDaySeries(p.id, exercise, mode).map((pt) => ({
+          value: pt.value,
+          label: pt.label,
+        }));
+        const peak = Math.max(0, ...points.map((pt) => pt.value));
+        return {
+          id: p.id,
+          name: p.name,
+          you: p.id === meId,
+          color: p.id === meId ? colors.accent : colors.them,
+          points,
+          peak,
+        };
+      }),
+    [profiles, exercise, mode, meId]
+  );
+
+  const hasLoggedData = series.some((s) => s.peak > 0);
 
   return (
     <Screen>
@@ -67,7 +70,7 @@ export default function ProgressScreen() {
         <View style={styles.topbar}>
           <Button label="Week" variant="line" small onPress={() => router.back()} />
         </View>
-        <Display style={{ fontSize: 40, marginTop: 10 }}>Progress</Display>
+        <Display testID="progress-heading" style={{ fontSize: 40, marginTop: 10 }}>Progress</Display>
         <Muted style={{ marginBottom: 12 }}>
           Est. 1RM for weight lifts · total minutes for timed work.
         </Muted>
@@ -96,12 +99,18 @@ export default function ProgressScreen() {
           </View>
         </ScrollView>
 
-        <View style={styles.chart}>
-          {series[0] ? (
+        <View style={styles.chart} testID="progress-chart">
+          {!hasLoggedData ? (
+            <Muted testID="progress-empty">
+              Log this exercise to see your rolling week.
+            </Muted>
+          ) : series[0] ? (
             Platform.OS === "web" ? (
               // gifted-charts LineChart currently throws on RN-web; keep a readable fallback.
               <View style={styles.webChart} testID="progress-web-chart">
-                {series.map((s) => (
+                {series
+                  .filter((s) => s.peak > 0)
+                  .map((s) => (
                   <View key={s.id} style={styles.webSeries}>
                     <Muted>
                       {s.name}
@@ -109,18 +118,18 @@ export default function ProgressScreen() {
                     </Muted>
                     <View style={styles.webBars}>
                       {s.points.map((pt, i) => {
-                        const max = Math.max(
-                          1,
-                          ...s.points.map((p) => p.value)
-                        );
+                        const max = Math.max(1, s.peak);
                         return (
                           <View
                             key={`${s.id}-${i}`}
                             style={[
                               styles.webBar,
                               {
-                                height: 8 + (pt.value / max) * 72,
+                                height: pt.value
+                                  ? 8 + (pt.value / max) * 72
+                                  : 4,
                                 backgroundColor: s.color,
+                                opacity: pt.value ? 0.9 : 0.25,
                               },
                             ]}
                           />
@@ -132,8 +141,11 @@ export default function ProgressScreen() {
               </View>
             ) : (
               <LineChart
-                data={series[0].points}
-                data2={series[1]?.points}
+                data={series.find((s) => s.peak > 0)?.points ?? series[0].points}
+                data2={
+                  series.filter((s) => s.peak > 0)[1]?.points ??
+                  series[1]?.points
+                }
                 color={series[0].color}
                 color2={series[1]?.color}
                 thickness={2}
@@ -161,7 +173,9 @@ export default function ProgressScreen() {
         <Mini style={{ marginTop: 12 }}>
           {mode === "time" ? "Best minutes" : "Best est. 1RM"}
         </Mini>
-        {series.map((s) => (
+        {series
+          .filter((s) => s.peak > 0)
+          .map((s) => (
           <View key={s.id} style={styles.person}>
             <View style={styles.av}>
               <Body style={{ fontSize: 12 }}>{initials(s.name)}</Body>
@@ -172,7 +186,7 @@ export default function ProgressScreen() {
                 {s.you ? " (you)" : ""}
               </Body>
               <Muted>
-                {s.points.at(-1)?.value}
+                {s.peak}
                 {mode === "time" ? " min" : " lb"}
               </Muted>
             </View>
