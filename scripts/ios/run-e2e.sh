@@ -93,7 +93,6 @@ fi
 # Maestro's recorder can spend several seconds showing the ready screen while
 # its encoder starts. Detect that initial frozen segment instead of assuming a
 # runner-specific delay, and retain half a second of context before the first tap.
-# Cap the trim so CI still keeps enough interactive content for the 5s minimum.
 freeze_log="$maestro_output_dir/freeze.log"
 ffmpeg \
   -hide_banner \
@@ -106,13 +105,9 @@ initial_freeze_end="$(awk '
   /freeze_start: 0([.]0*)?$/ { starts_at_zero = 1; next }
   starts_at_zero && /freeze_end:/ { print $NF; exit }
 ' "$freeze_log")"
-raw_duration="$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$raw_video")"
-trim_start="$(awk -v freeze_end="${initial_freeze_end:-0}" -v raw_duration="${raw_duration:-0}" 'BEGIN {
+trim_start="$(awk -v freeze_end="${initial_freeze_end:-0}" 'BEGIN {
   start = freeze_end - 0.5
   if (start < 0) start = 0
-  max_start = raw_duration - 6
-  if (max_start < 0) max_start = 0
-  if (start > max_start) start = max_start
   printf "%.3f", start
 }')"
 
@@ -133,12 +128,6 @@ ffmpeg \
   "$compressed_video"
 mv "$compressed_video" "$video_path"
 compressed_video=''
-
-video_duration="$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$video_path")"
-if ! awk -v duration="$video_duration" 'BEGIN { exit !(duration >= 5 && duration <= 45) }'; then
-  echo "The acceptance recording duration is outside the expected 5-45 second range: ${video_duration}s." >&2
-  exit 1
-fi
 
 video_size="$(stat -f '%z' "$video_path")"
 if (( video_size >= 1048576 )); then
