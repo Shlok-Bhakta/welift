@@ -49,6 +49,11 @@ export function startOfDay(d: Date): Date {
 }
 
 export function dayKey(d: Date | string): string {
+  // Date-only ISO strings are UTC midnight in JS — keep the calendar day as-is
+  // so "2024-01-15" does not shift to the previous local day in western TZs.
+  if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    return d;
+  }
   const x = new Date(d);
   return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
 }

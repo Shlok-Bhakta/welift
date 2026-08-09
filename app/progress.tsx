@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { LineChart } from "react-native-gifted-charts";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -98,28 +98,63 @@ export default function ProgressScreen() {
 
         <View style={styles.chart}>
           {series[0] ? (
-            <LineChart
-              data={series[0].points}
-              data2={series[1]?.points}
-              color={series[0].color}
-              color2={series[1]?.color}
-              thickness={2}
-              thickness2={2}
-              hideDataPoints={false}
-              dataPointsColor={series[0].color}
-              dataPointsColor2={series[1]?.color}
-              dataPointsRadius={3}
-              curved
-              areaChart={false}
-              yAxisColor={colors.line}
-              xAxisColor={colors.line}
-              yAxisTextStyle={{ color: colors.muted, fontSize: 10 }}
-              xAxisLabelTextStyle={{ color: colors.muted, fontSize: 10 }}
-              rulesColor={colors.line}
-              noOfSections={4}
-              height={180}
-              width={320}
-            />
+            Platform.OS === "web" ? (
+              // gifted-charts LineChart currently throws on RN-web; keep a readable fallback.
+              <View style={styles.webChart} testID="progress-web-chart">
+                {series.map((s) => (
+                  <View key={s.id} style={styles.webSeries}>
+                    <Muted>
+                      {s.name}
+                      {s.you ? " (you)" : ""}
+                    </Muted>
+                    <View style={styles.webBars}>
+                      {s.points.map((pt, i) => {
+                        const max = Math.max(
+                          1,
+                          ...s.points.map((p) => p.value)
+                        );
+                        return (
+                          <View
+                            key={`${s.id}-${i}`}
+                            style={[
+                              styles.webBar,
+                              {
+                                height: 8 + (pt.value / max) * 72,
+                                backgroundColor: s.color,
+                              },
+                            ]}
+                          />
+                        );
+                      })}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <LineChart
+                data={series[0].points}
+                data2={series[1]?.points}
+                color={series[0].color}
+                color2={series[1]?.color}
+                thickness={2}
+                thickness2={2}
+                hideDataPoints={false}
+                dataPointsColor={series[0].color}
+                dataPointsColor2={series[1]?.color}
+                dataPointsRadius={3}
+                curved
+                areaChart={false}
+                yAxisColor={colors.line}
+                xAxisColor={colors.line}
+                yAxisTextStyle={{ color: colors.muted, fontSize: 10 }}
+                xAxisLabelTextStyle={{ color: colors.muted, fontSize: 10 }}
+                rulesColor={colors.line}
+                noOfSections={4}
+                height={180}
+                width={320}
+                isAnimated={false}
+              />
+            )
           ) : null}
         </View>
 
@@ -168,6 +203,22 @@ const styles = StyleSheet.create({
   chart: {
     marginTop: 16,
     paddingVertical: 8,
+  },
+  webChart: {
+    gap: 14,
+    paddingVertical: 8,
+  },
+  webSeries: { gap: 6 },
+  webBars: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 6,
+    height: 90,
+  },
+  webBar: {
+    width: 18,
+    borderRadius: 3,
+    opacity: 0.9,
   },
   person: {
     flexDirection: "row",

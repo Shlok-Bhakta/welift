@@ -1,0 +1,4 @@
+interface:
+  display_name: "Record iOS Demo"
+  short_description: "Capture tightly bounded iOS acceptance demo videos"
+  default_prompt: "Use $record-ios-demo to record, validate, and prepare a concise iOS acceptance demo."
