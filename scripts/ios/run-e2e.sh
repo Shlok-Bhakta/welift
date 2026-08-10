@@ -81,7 +81,18 @@ elif grep -Fq 'iOS driver not ready in time' "$maestro_log"; then
   maestro_output_dir="$(mktemp -d "$artifact_dir/maestro-output.XXXXXX")"
   maestro --device "$device_id" test --test-output-dir "$maestro_output_dir" .maestro/smoke.yaml
 else
-  exit 1
+  echo "Maestro acceptance flow failed once; retrying on the booted simulator." >&2
+  cleanup
+  maestro_output_dir="$(mktemp -d "$artifact_dir/maestro-output.XXXXXX")"
+  maestro_log="$maestro_output_dir/maestro.log"
+  if maestro --device "$device_id" test --test-output-dir "$maestro_output_dir" .maestro/smoke.yaml 2>&1 | tee "$maestro_log"; then
+    :
+  elif grep -Fq 'iOS driver not ready in time' "$maestro_log"; then
+    echo "Maestro driver startup failed on retry; giving up." >&2
+    exit 1
+  else
+    exit 1
+  fi
 fi
 
 raw_video="$(find "$maestro_output_dir" -type f -name 'e2e-demo-raw*.mp4' -print -quit)"

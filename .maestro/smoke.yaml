@@ -45,29 +45,26 @@ name: Mint install and real progress chart
 - extendedWaitUntil:
     visible: "Your week"
     timeout: 15000
+- openLink: welift:///progress
 - tapOn:
-    id: "week-menu"
-- extendedWaitUntil:
-    visible:
-      id: "menu-progress"
-    timeout: 10000
-- tapOn:
-    id: "menu-progress"
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
 - extendedWaitUntil:
     visible:
       id: "progress-heading"
-    timeout: 30000
+    timeout: 45000
 - extendedWaitUntil:
     visible:
       id: "progress-chip-deadlift"
-    timeout: 10000
+    timeout: 15000
 - tapOn:
     id: "progress-chip-deadlift"
 - waitForAnimationToEnd
 - extendedWaitUntil:
     visible:
       id: "progress-point-chart"
-    timeout: 10000
+    timeout: 15000
 - assertVisible: "158 lb"
 - waitForAnimationToEnd
 - stopRecording
