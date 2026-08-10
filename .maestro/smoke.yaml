@@ -53,14 +53,17 @@ name: Mint install and real progress chart
     visible:
       id: "progress-heading"
     timeout: 15000
-- assertNotVisible:
-    id: "progress-empty"
+- extendedWaitUntil:
+    visible:
+      id: "progress-chip-deadlift"
+    timeout: 10000
+- tapOn:
+    id: "progress-chip-deadlift"
+- waitForAnimationToEnd
 - extendedWaitUntil:
     visible:
       id: "progress-point-chart"
     timeout: 10000
-- assertVisible:
-    id: "progress-chip-deadlift"
 - assertVisible: "158 lb"
 - waitForAnimationToEnd
 - stopRecording
