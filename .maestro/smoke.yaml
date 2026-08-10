@@ -45,16 +45,6 @@ name: Mint install and real progress chart
 - extendedWaitUntil:
     visible: "Your week"
     timeout: 15000
-- scrollUntilVisible:
-    element:
-      id: "week-active-pill"
-    direction: DOWN
-    timeout: 15000
-- scrollUntilVisible:
-    element:
-      id: "week-menu"
-    direction: UP
-    timeout: 10000
 - openLink: welift:///progress
 - tapOn:
     text: "Open"
@@ -63,7 +53,14 @@ name: Mint install and real progress chart
     visible:
       id: "progress-heading"
     timeout: 15000
-- tapOn: "Deadlift"
+- assertNotVisible:
+    id: "progress-empty"
+- extendedWaitUntil:
+    visible:
+      id: "progress-point-chart"
+    timeout: 10000
+- assertVisible:
+    id: "progress-chip-deadlift"
 - assertVisible: "158 lb"
 - waitForAnimationToEnd
 - stopRecording

@@ -164,10 +164,11 @@ describe("screen flows (E2E-lite)", () => {
     useWelift.getState().saveDraft();
 
     render(<ProgressScreen />);
-    fireEvent.press(screen.getByText("Mint Chart Lift"));
     expect(screen.getByText("Progress")).toBeTruthy();
+    expect(screen.queryByTestId("progress-empty")).toBeNull();
     expect(screen.getByTestId("progress-chart")).toBeTruthy();
     expect(screen.getByText(/158 lb/)).toBeTruthy();
+    expect(screen.getByTestId("progress-chip-mint-chart-lift")).toBeTruthy();
     const meId = useWelift.getState().meId!;
     expect(
       exerciseDaySeries(meId, "mint-chart-lift", "weight").filter(
