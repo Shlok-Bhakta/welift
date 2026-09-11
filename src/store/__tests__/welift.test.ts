@@ -2,7 +2,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { dayKey } from "../../lib/format";
 import type { WeliftBundle } from "../../types";
-import { bestMetric, dayLoad, useWelift, weekLoads } from "../welift";
+import {
+  bestMetric,
+  dayLoad,
+  exerciseDaySeries,
+  useWelift,
+  weekLoads,
+} from "../welift";
 
 function resetStore() {
   useWelift.setState({
@@ -29,40 +35,26 @@ describe("welift store", () => {
   });
 
   describe("createProfile", () => {
-    it("creates me, seeds sessions, and adds Alex demo friend", () => {
+    it("creates a mint profile with no seeded sessions or demo friends", () => {
       useWelift.getState().createProfile("  Shlok  ");
       const state = useWelift.getState();
 
       expect(state.meId).toBeTruthy();
       expect(state.me()?.name).toBe("Shlok");
-      expect(state.me()?.sessions.length).toBeGreaterThanOrEqual(3);
-      expect(Object.keys(state.profiles)).toContain("alex-demo");
-      expect(state.profiles["alex-demo"].name).toBe("Alex");
-      expect(state.modes.squat).toBe("weight");
-      expect(state.modes.elliptical).toBe("time");
-    });
-
-    it("does not add a second demo friend when one already exists", () => {
-      useWelift.getState().createProfile("Shlok");
-      const before = Object.keys(useWelift.getState().profiles).length;
-      // Re-run ensure path by creating again would wipe — instead import a friend
-      // and confirm ensureDemoFriend short-circuits when friends exist.
-      useWelift.getState().importBundle({
-        type: "welift/v1",
-        exportedAt: new Date().toISOString(),
-        profile: {
-          id: "friend-2",
-          name: "Sam",
-          bodyWeight: [],
-          catalog: {},
-          sessions: [],
-        },
-      });
-      expect(Object.keys(useWelift.getState().profiles).length).toBe(
-        before + 1
-      );
+      expect(state.me()?.sessions).toEqual([]);
+      expect(state.me()?.bodyWeight).toEqual([]);
+      expect(Object.keys(state.profiles)).toHaveLength(1);
+      expect(state.profiles["alex-demo"]).toBeUndefined();
     });
   });
+
+  function seedOneSession(day = "2099-01-15") {
+    useWelift.getState().openDay(day);
+    useWelift.getState().addExercise("Squat");
+    useWelift.getState().updateSet("squat", 0, { weight: 225, reps: 5 });
+    useWelift.getState().saveDraft();
+    return day;
+  }
 
   describe("draft session lifecycle", () => {
     beforeEach(() => {
@@ -82,6 +74,7 @@ describe("welift store", () => {
     });
 
     it("opens an existing session as an editable draft", () => {
+      seedOneSession();
       const me = useWelift.getState().me()!;
       const existing = me.sessions[0];
       const day = dayKey(existing.startedAt);
@@ -163,6 +156,7 @@ describe("welift store", () => {
     });
 
     it("prunes empty sets and deletes a session when nothing remains", () => {
+      seedOneSession();
       const me = useWelift.getState().me()!;
       const existing = me.sessions[0];
       const day = dayKey(existing.startedAt);
@@ -201,6 +195,7 @@ describe("welift store", () => {
     });
 
     it("deleteDraft removes the edited session", () => {
+      seedOneSession();
       const existing = useWelift.getState().me()!.sessions[0];
       const day = dayKey(existing.startedAt);
       useWelift.getState().openDay(day, existing.id);
@@ -414,17 +409,17 @@ describe("welift store", () => {
         type: "welift/v1",
         exportedAt: "2024-01-01T00:00:00.000Z",
         profile: {
-          id: "alex-demo",
-          name: "Alex Updated",
+          id: "friend-1",
+          name: "Riley Updated",
           bodyWeight: [],
           catalog: {},
           sessions: [],
         },
       });
-      expect(useWelift.getState().profiles["alex-demo"].name).toBe(
-        "Alex Updated"
+      expect(useWelift.getState().profiles["friend-1"].name).toBe(
+        "Riley Updated"
       );
-      expect(useWelift.getState().profiles["alex-demo"].sessions).toEqual([]);
+      expect(useWelift.getState().profiles["friend-1"].sessions).toEqual([]);
     });
 
     it("importBundle ignores invalid bundles", () => {
@@ -459,6 +454,48 @@ describe("welift store", () => {
       expect(useWelift.getState().modes).toMatchObject(exported.modes ?? {});
       // meId is not set by import alone — friend profile lands for People view
       expect(useWelift.getState().meId).toBeNull();
+    });
+  });
+
+  describe("exerciseDaySeries", () => {
+    beforeEach(() => {
+      useWelift.getState().createProfile("Shlok");
+    });
+
+    it("returns zeros for days without logged work", () => {
+      const meId = useWelift.getState().meId!;
+      const day = dayKey(new Date());
+      useWelift.getState().openDay(day);
+      useWelift.getState().addExercise("Brand New Lift");
+      useWelift.getState().updateSet("brand-new-lift", 0, {
+        weight: 135,
+        reps: 5,
+      });
+      useWelift.getState().saveDraft();
+
+      const series = exerciseDaySeries(meId, "brand-new-lift", "weight");
+      expect(series).toHaveLength(7);
+      expect(series.filter((p) => p.value > 0)).toHaveLength(1);
+      expect(series.find((p) => p.day === day)?.value).toBeGreaterThan(0);
+    });
+
+    it("tracks best est. 1RM per day across sessions", () => {
+      const meId = useWelift.getState().meId!;
+      const day = "2099-05-01";
+      useWelift.getState().openDay(day);
+      useWelift.getState().addExercise("Deadlift");
+      useWelift.getState().updateSet("deadlift", 0, { weight: 225, reps: 5 });
+      useWelift.getState().saveDraft();
+
+      const series = exerciseDaySeries(
+        meId,
+        "deadlift",
+        "weight",
+        new Date(`${day}T12:00:00`)
+      );
+      const point = series.find((p) => p.day === day);
+      expect(point?.value).toBe(Math.round(225 * (1 + 5 / 30)));
+      expect(series.filter((p) => p.value > 0)).toHaveLength(1);
     });
   });
 

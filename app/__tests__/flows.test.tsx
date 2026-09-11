@@ -3,7 +3,7 @@ import { Alert } from "react-native";
 
 import { dayKey } from "../../src/lib/format";
 import * as share from "../../src/lib/share";
-import { useWelift } from "../../src/store/welift";
+import { useWelift, exerciseDaySeries } from "../../src/store/welift";
 import {
   mockRouter,
   prepareFlow,
@@ -56,18 +56,18 @@ describe("screen flows (E2E-lite)", () => {
 
     expect(useWelift.getState().me()?.name).toBe("Shlok");
     expect(mockRouter.replace).toHaveBeenCalledWith("/week");
-    expect(useWelift.getState().profiles["alex-demo"]).toBeTruthy();
+    expect(useWelift.getState().me()?.sessions).toEqual([]);
+    expect(useWelift.getState().profiles["alex-demo"]).toBeUndefined();
   });
 
-  it("week shows seeded history and opens an empty day into session", () => {
+  it("week starts empty and opens session from empty-day CTA", () => {
     seedProfile("Shlok");
     render(<WeekScreen />);
 
     expect(screen.getByText("Your week")).toBeTruthy();
     expect(screen.getByText("Shlok")).toBeTruthy();
-    expect(screen.getByText(/sets \/ bouts this week/)).toBeTruthy();
-
-    // Today is empty in seed data → empty-day CTA
+    expect(screen.getByText(/Quiet stretch/i)).toBeTruthy();
+    expect(screen.getByText("0 active")).toBeTruthy();
     fireEvent.press(screen.getByText("Log this day"));
     expect(useWelift.getState().draft).toBeTruthy();
     expect(mockRouter.push).toHaveBeenCalledWith("/session");
@@ -119,7 +119,7 @@ describe("screen flows (E2E-lite)", () => {
 
     render(<PeopleScreen />);
     expect(screen.getByText(/Shlok/)).toBeTruthy();
-    expect(screen.getByText(/Alex/)).toBeTruthy();
+    expect(screen.queryByText(/Alex/)).toBeNull();
 
     fireEvent.press(screen.getByText("Export"));
     await waitFor(() => {
@@ -152,14 +152,29 @@ describe("screen flows (E2E-lite)", () => {
     ).toMatchObject({ value: 190, unit: "lb" });
   });
 
-  it("progress shows shared exercise chart chrome", () => {
+  it("progress shows real logged data only", () => {
     seedProfile("Shlok");
+    const day = dayKey(new Date());
+    useWelift.getState().openDay(day);
+    useWelift.getState().addExercise("Mint Chart Lift");
+    useWelift.getState().updateSet("mint-chart-lift", 0, {
+      weight: 135,
+      reps: 5,
+    });
+    useWelift.getState().saveDraft();
+
     render(<ProgressScreen />);
     expect(screen.getByText("Progress")).toBeTruthy();
+    expect(screen.queryByTestId("progress-empty")).toBeNull();
+    expect(screen.getByTestId("progress-chart")).toBeTruthy();
+    expect(screen.getByText(/158 lb/)).toBeTruthy();
+    expect(screen.getByTestId("progress-chip-mint-chart-lift")).toBeTruthy();
+    const meId = useWelift.getState().meId!;
     expect(
-      screen.getByText(/Est\. 1RM for weight lifts/i)
-    ).toBeTruthy();
-    expect(screen.getByText("Deadlift")).toBeTruthy();
+      exerciseDaySeries(meId, "mint-chart-lift", "weight").filter(
+        (p) => p.value > 0
+      )
+    ).toHaveLength(1);
   });
 
   it("full happy path: onboard → log → save → day has the lift", () => {

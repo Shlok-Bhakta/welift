@@ -61,81 +61,6 @@ function uid(): string {
   return Crypto.randomUUID();
 }
 
-function daysAgo(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  d.setHours(17, 0, 0, 0);
-  return d.toISOString();
-}
-
-function seedSession(
-  pid: string,
-  iso: string,
-  items: Array<[string, ExerciseMode, ...number[]]>,
-  modes: Record<string, ExerciseMode>
-): Session {
-  const map: Record<string, SessionExercise> = {};
-  for (const item of items) {
-    const [name, mode, a, b] = item;
-    const key = slugify(name);
-    modes[key] = mode;
-    if (!map[key]) map[key] = { key, name, mode, sets: [] };
-    if (mode === "time") {
-      map[key].sets.push({
-        kind: "time",
-        minutes: a ?? 10,
-        seconds: b ?? 0,
-        note: "",
-      });
-    } else {
-      map[key].sets.push({
-        kind: "weight",
-        weight: a ?? 135,
-        reps: b ?? 5,
-        unit: "lb",
-      });
-    }
-  }
-  return {
-    id: uid(),
-    profileId: pid,
-    startedAt: iso,
-    endedAt: iso,
-    durationSec: 2400 + Math.floor(Math.random() * 1800),
-    exercises: Object.values(map),
-  };
-}
-
-function ensureDemoFriend(
-  profiles: Record<string, Profile>,
-  meId: string,
-  modes: Record<string, ExerciseMode>
-) {
-  if (Object.values(profiles).some((p) => p.id !== meId)) return;
-  const id = "alex-demo";
-  profiles[id] = {
-    id,
-    name: "Alex",
-    bodyWeight: [{ date: daysAgo(1), value: 176, unit: "lb" }],
-    catalog: {
-      "romanian-deadlift": { key: "romanian-deadlift", name: "Romanian Deadlift" },
-      elliptical: { key: "elliptical", name: "Elliptical" },
-    },
-    sessions: [
-      seedSession(
-        id,
-        daysAgo(2),
-        [
-          ["Deadlift", "weight", 305, 3],
-          ["Romanian Deadlift", "weight", 195, 6],
-          ["Elliptical", "time", 20, 0],
-        ],
-        modes
-      ),
-    ],
-  };
-}
-
 export const useWelift = create<WeliftState>()(
   persist(
     (set, get) => ({
@@ -171,54 +96,17 @@ export const useWelift = create<WeliftState>()(
 
       createProfile: (name) => {
         const id = uid();
-        const modes: Record<string, ExerciseMode> = {};
         const profile: Profile = {
           id,
           name: name.trim(),
-          bodyWeight: [{ date: daysAgo(5), value: 182, unit: "lb" }],
+          bodyWeight: [],
           catalog: {},
-          sessions: [
-            seedSession(
-              id,
-              daysAgo(5),
-              [
-                ["Squat", "weight", 225, 5],
-                ["Bench Press", "weight", 165, 8],
-              ],
-              modes
-            ),
-            seedSession(
-              id,
-              daysAgo(3),
-              [
-                ["Deadlift", "weight", 315, 3],
-                ["Elliptical", "time", 25, 0],
-              ],
-              modes
-            ),
-            seedSession(
-              id,
-              daysAgo(1),
-              [
-                ["Overhead Press", "weight", 115, 6],
-                ["Pull Up", "weight", 0, 8],
-              ],
-              modes
-            ),
-          ],
+          sessions: [],
         };
-        for (const s of profile.sessions) {
-          for (const e of s.exercises) {
-            profile.catalog[e.key] = { key: e.key, name: e.name };
-            modes[e.key] = e.mode;
-          }
-        }
-        const profiles = { [id]: profile };
-        ensureDemoFriend(profiles, id, modes);
         set({
           meId: id,
-          profiles,
-          modes,
+          profiles: { [id]: profile },
+          modes: {},
           selectedDay: dayKey(new Date()),
         });
       },
@@ -506,6 +394,45 @@ export function dayLoad(day: string): number {
 
 export function weekLoads(): number[] {
   return rollingDays().map((d) => dayLoad(dayKey(d)));
+}
+
+export function exerciseDaySeries(
+  profileId: string,
+  exerciseKey: string,
+  mode: ExerciseMode,
+  now = new Date()
+): Array<{ label: string; value: number; day: string }> {
+  const p = useWelift.getState().profiles[profileId];
+  if (!p) return [];
+
+  return rollingDays(now).map((d) => {
+    const dk = dayKey(d);
+    const label = d.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+    let best = 0;
+    for (const s of p.sessions) {
+      if (dayKey(s.startedAt) !== dk) continue;
+      for (const e of s.exercises) {
+        if (e.key !== exerciseKey) continue;
+        for (const set of e.sets) {
+          if (mode === "time" && set.kind === "time") {
+            best = Math.max(
+              best,
+              (Number(set.minutes) || 0) + (Number(set.seconds) || 0) / 60
+            );
+          } else if (set.kind === "weight") {
+            best = Math.max(
+              best,
+              epley(Number(set.weight) || 0, Number(set.reps) || 0)
+            );
+          }
+        }
+      }
+    }
+    return { label, value: Math.round(best), day: dk };
+  });
 }
 
 export function bestMetric(

@@ -80,6 +80,6 @@ test.describe("WeLift web smoke", () => {
     await expect(
       page.getByText("Est. 1RM for weight lifts", { exact: false })
     ).toBeVisible();
-    await expect(page.getByTestId("progress-web-chart")).toBeVisible();
+    await expect(page.getByTestId("progress-empty")).toBeVisible();
   });
 });

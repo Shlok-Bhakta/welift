@@ -1,29 +1,70 @@
 appId: us.shloklab.welift
-name: Onboard name stays above keyboard
+name: Mint install and real progress chart
 ---
 - launchApp:
     clearState: true
+- tapOn:
+    text: "Cancel"
+    optional: true
 - extendedWaitUntil:
     visible:
       id: "onboard-name"
     timeout: 30000
 - assertVisible: "Enter your name"
-- assertVisible: "Next"
+- assertNotVisible: "Alex"
 - startRecording: e2e-demo-raw
 - waitForAnimationToEnd
 - tapOn:
     id: "onboard-name"
-- waitForAnimationToEnd
-- assertVisible:
-    id: "onboard-name"
-- assertVisible: "Next"
 - eraseText
 - inputText: "Demo"
-- waitForAnimationToEnd
 - tapOn: "Next"
 - extendedWaitUntil:
     visible: "Your week"
     timeout: 15000
 - assertVisible: "Demo"
+- assertNotVisible: "Alex"
+- scrollUntilVisible:
+    element:
+      id: "week-empty-day"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "week-empty-day"
+- extendedWaitUntil:
+    visible:
+      id: "quick-add-deadlift"
+    timeout: 15000
+- tapOn:
+    id: "quick-add-deadlift"
+- extendedWaitUntil:
+    visible: "Deadlift"
+    timeout: 10000
+- tapOn:
+    id: "session-save"
+- extendedWaitUntil:
+    visible: "Your week"
+    timeout: 15000
+- openLink: welift:///progress
+- tapOn:
+    text: "Open"
+    optional: true
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: "progress-heading"
+    timeout: 45000
+- extendedWaitUntil:
+    visible:
+      id: "progress-chip-deadlift"
+    timeout: 15000
+- tapOn:
+    id: "progress-chip-deadlift"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: "progress-point-chart"
+    timeout: 15000
+- assertVisible: "158 lb"
 - waitForAnimationToEnd
 - stopRecording

@@ -14,15 +14,68 @@ import {
 } from "../src/components/ui";
 import { COMMON_EXERCISES } from "../src/lib/exercises";
 import { initials, slugify } from "../src/lib/format";
-import { bestMetric, useWelift } from "../src/store/welift";
+import { exerciseDaySeries, useWelift } from "../src/store/welift";
 import { colors } from "../src/theme";
+
+type ChartPoint = { value: number; label: string };
+
+function ProgressPointChart({
+  points,
+  color,
+  testID,
+}: {
+  points: ChartPoint[];
+  color: string;
+  testID?: string;
+}) {
+  const peak = Math.max(...points.map((p) => p.value), 1);
+  const plotHeight = 140;
+  const ticks = Array.from({ length: 5 }, (_, i) =>
+    Math.round((peak * (4 - i)) / 4)
+  );
+
+  return (
+    <View testID={testID} style={styles.pointChart}>
+      <View style={styles.pointYAxis}>
+        {ticks.map((tick) => (
+          <Muted key={tick} style={styles.pointTick}>
+            {tick}
+          </Muted>
+        ))}
+      </View>
+      <View style={styles.pointPlotWrap}>
+        {ticks.slice(1).map((tick) => (
+          <View key={tick} style={styles.pointRule} />
+        ))}
+        <View style={styles.pointRow}>
+          {points.map((pt, i) => {
+            const barHeight = Math.max(8, (pt.value / peak) * plotHeight);
+            return (
+              <View key={`${pt.label}-${i}`} style={styles.pointCol}>
+                <View style={[styles.pointBarTrack, { height: plotHeight }]}>
+                  <View
+                    style={[
+                      styles.pointBar,
+                      { height: barHeight, backgroundColor: color },
+                    ]}
+                  />
+                  <View style={[styles.pointDot, { backgroundColor: color }]} />
+                </View>
+                <Mini style={styles.pointLabel}>{pt.label}</Mini>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    </View>
+  );
+}
 
 export default function ProgressScreen() {
   const insets = useSafeAreaInsets();
   const profiles = useWelift((s) => s.profiles);
   const meId = useWelift((s) => s.meId);
   const knownMode = useWelift((s) => s.knownMode);
-  const [exercise, setExercise] = useState("deadlift");
 
   const keys = useMemo(() => {
     const map = new Map(COMMON_EXERCISES.map((c) => [slugify(c.name), c.name]));
@@ -34,26 +87,51 @@ export default function ProgressScreen() {
     return [...map.entries()];
   }, [profiles]);
 
-  const mode = knownMode(exercise);
-  const labels = [5, 4, 3, 2, 1, 0].map((i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - i * 3);
-    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  });
+  const loggedKeys = useMemo(() => {
+    if (!meId) return [];
+    return keys.filter(([k]) =>
+      exerciseDaySeries(meId, k, knownMode(k)).some((pt) => pt.value > 0)
+    );
+  }, [keys, meId, knownMode, profiles]);
 
-  const series = Object.values(profiles).map((p) => {
-    const best = bestMetric(p.id, exercise, mode) || (mode === "time" ? 20 : 200);
-    return {
-      id: p.id,
-      name: p.name,
-      you: p.id === meId,
-      color: p.id === meId ? colors.accent : colors.them,
-      points: labels.map((_, i) => ({
-        value: Math.round(best * (0.84 + i * 0.03)),
-        label: labels[i],
-      })),
-    };
-  });
+  const sortedKeys = useMemo(() => {
+    const logged = new Set(loggedKeys.map(([k]) => k));
+    return [
+      ...keys.filter(([k]) => logged.has(k)),
+      ...keys.filter(([k]) => !logged.has(k)),
+    ];
+  }, [keys, loggedKeys]);
+
+  const [picked, setPicked] = useState<string | null>(null);
+  const exercise =
+    picked ?? loggedKeys[0]?.[0] ?? sortedKeys[0]?.[0] ?? "deadlift";
+  const mode = knownMode(exercise);
+
+  const series = useMemo(
+    () =>
+      Object.values(profiles).map((p) => {
+        const points = exerciseDaySeries(p.id, exercise, mode)
+          .filter((pt) => pt.value > 0)
+          .map((pt) => ({
+            value: pt.value,
+            label: pt.label,
+          }));
+        const peak = points.length ? Math.max(...points.map((pt) => pt.value)) : 0;
+        return {
+          id: p.id,
+          name: p.name,
+          you: p.id === meId,
+          color: p.id === meId ? colors.accent : colors.them,
+          points,
+          peak,
+        };
+      }),
+    [profiles, exercise, mode, meId]
+  );
+
+  const plotted = series.filter((s) => s.points.length > 0);
+  const hasLoggedData = plotted.length > 0;
+  const primary = plotted[0];
 
   return (
     <Screen>
@@ -67,21 +145,21 @@ export default function ProgressScreen() {
         <View style={styles.topbar}>
           <Button label="Week" variant="line" small onPress={() => router.back()} />
         </View>
-        <Display style={{ fontSize: 40, marginTop: 10 }}>Progress</Display>
+        <Display testID="progress-heading" style={{ fontSize: 40, marginTop: 10 }}>
+          Progress
+        </Display>
         <Muted style={{ marginBottom: 12 }}>
           Est. 1RM for weight lifts · total minutes for timed work.
         </Muted>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={{ flexDirection: "row", gap: 8 }}>
-            {keys.map(([k, n]) => (
+            {sortedKeys.map(([k, n]) => (
               <Pressable
                 key={k}
-                onPress={() => setExercise(k)}
-                style={[
-                  styles.chip,
-                  exercise === k && styles.chipOn,
-                ]}
+                testID={`progress-chip-${k}`}
+                onPress={() => setPicked(k)}
+                style={[styles.chip, exercise === k && styles.chipOn]}
               >
                 <Body
                   style={{
@@ -96,12 +174,15 @@ export default function ProgressScreen() {
           </View>
         </ScrollView>
 
-        <View style={styles.chart}>
-          {series[0] ? (
+        <View style={styles.chart} testID="progress-chart">
+          {!hasLoggedData ? (
+            <Muted testID="progress-empty">
+              Log this exercise to see your rolling week.
+            </Muted>
+          ) : primary ? (
             Platform.OS === "web" ? (
-              // gifted-charts LineChart currently throws on RN-web; keep a readable fallback.
               <View style={styles.webChart} testID="progress-web-chart">
-                {series.map((s) => (
+                {plotted.map((s) => (
                   <View key={s.id} style={styles.webSeries}>
                     <Muted>
                       {s.name}
@@ -109,10 +190,7 @@ export default function ProgressScreen() {
                     </Muted>
                     <View style={styles.webBars}>
                       {s.points.map((pt, i) => {
-                        const max = Math.max(
-                          1,
-                          ...s.points.map((p) => p.value)
-                        );
+                        const max = Math.max(1, s.peak);
                         return (
                           <View
                             key={`${s.id}-${i}`}
@@ -130,30 +208,38 @@ export default function ProgressScreen() {
                   </View>
                 ))}
               </View>
-            ) : (
-              <LineChart
-                data={series[0].points}
-                data2={series[1]?.points}
-                color={series[0].color}
-                color2={series[1]?.color}
-                thickness={2}
-                thickness2={2}
-                hideDataPoints={false}
-                dataPointsColor={series[0].color}
-                dataPointsColor2={series[1]?.color}
-                dataPointsRadius={3}
-                curved
-                areaChart={false}
-                yAxisColor={colors.line}
-                xAxisColor={colors.line}
-                yAxisTextStyle={{ color: colors.muted, fontSize: 10 }}
-                xAxisLabelTextStyle={{ color: colors.muted, fontSize: 10 }}
-                rulesColor={colors.line}
-                noOfSections={4}
-                height={180}
-                width={320}
-                isAnimated={false}
+            ) : primary.points.length === 1 ? (
+              <ProgressPointChart
+                testID="progress-point-chart"
+                points={primary.points}
+                color={primary.color}
               />
+            ) : (
+              <View testID="progress-line-chart">
+                <LineChart
+                  data={primary.points}
+                  data2={plotted[1]?.points}
+                  color={primary.color}
+                  color2={plotted[1]?.color}
+                  thickness={2}
+                  thickness2={2}
+                  hideDataPoints={false}
+                  dataPointsColor={primary.color}
+                  dataPointsColor2={plotted[1]?.color}
+                  dataPointsRadius={4}
+                  curved={false}
+                  areaChart={false}
+                  yAxisColor={colors.line}
+                  xAxisColor={colors.line}
+                  yAxisTextStyle={{ color: colors.muted, fontSize: 10 }}
+                  xAxisLabelTextStyle={{ color: colors.muted, fontSize: 10 }}
+                  rulesColor={colors.line}
+                  noOfSections={4}
+                  height={180}
+                  width={320}
+                  isAnimated={false}
+                />
+              </View>
             )
           ) : null}
         </View>
@@ -161,7 +247,7 @@ export default function ProgressScreen() {
         <Mini style={{ marginTop: 12 }}>
           {mode === "time" ? "Best minutes" : "Best est. 1RM"}
         </Mini>
-        {series.map((s) => (
+        {plotted.map((s) => (
           <View key={s.id} style={styles.person}>
             <View style={styles.av}>
               <Body style={{ fontSize: 12 }}>{initials(s.name)}</Body>
@@ -171,8 +257,8 @@ export default function ProgressScreen() {
                 {s.name}
                 {s.you ? " (you)" : ""}
               </Body>
-              <Muted>
-                {s.points.at(-1)?.value}
+              <Muted testID={`progress-peak-${s.id}`}>
+                {s.peak}
                 {mode === "time" ? " min" : " lb"}
               </Muted>
             </View>
@@ -203,6 +289,64 @@ const styles = StyleSheet.create({
   chart: {
     marginTop: 16,
     paddingVertical: 8,
+    minHeight: 180,
+  },
+  pointChart: {
+    flexDirection: "row",
+    gap: 8,
+    minHeight: 180,
+  },
+  pointYAxis: {
+    width: 28,
+    justifyContent: "space-between",
+    paddingVertical: 4,
+  },
+  pointTick: {
+    fontSize: 10,
+    textAlign: "right",
+  },
+  pointPlotWrap: {
+    flex: 1,
+    position: "relative",
+    justifyContent: "flex-end",
+  },
+  pointRule: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.line,
+  },
+  pointRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 12,
+    paddingTop: 8,
+  },
+  pointCol: {
+    flex: 1,
+    alignItems: "center",
+    gap: 8,
+  },
+  pointBarTrack: {
+    width: "100%",
+    justifyContent: "flex-end",
+    alignItems: "center",
+  },
+  pointBar: {
+    width: 4,
+    borderRadius: 2,
+    opacity: 0.35,
+  },
+  pointDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginTop: -5,
+  },
+  pointLabel: {
+    fontSize: 10,
+    textAlign: "center",
   },
   webChart: {
     gap: 14,

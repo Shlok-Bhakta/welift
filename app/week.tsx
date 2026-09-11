@@ -65,6 +65,7 @@ export default function WeekScreen() {
               onPress={() => setMenu(true)}
               style={styles.iconBtn}
               hitSlop={8}
+              testID="week-menu"
             >
               <Body style={{ fontSize: 18 }}>☰</Body>
             </Pressable>
@@ -124,7 +125,7 @@ export default function WeekScreen() {
                   : "Quiet stretch — tap a day to log"}
               </Body>
             </View>
-            <Pill>{`${loads.filter((x) => x > 0).length} active`}</Pill>
+            <Pill testID="week-active-pill">{`${loads.filter((x) => x > 0).length} active`}</Pill>
           </View>
           <View style={styles.bars}>
             {loads.map((n, i) => (
@@ -166,6 +167,7 @@ export default function WeekScreen() {
 
         {!list.length ? (
           <Pressable
+            testID="week-empty-day"
             onPress={() => {
               openDay(selectedDay);
               router.push("/session");
@@ -235,6 +237,7 @@ export default function WeekScreen() {
             <MenuLink
               title="Progress"
               sub="You + circle"
+              testID="menu-progress"
               onPress={() => {
                 setMenu(false);
                 router.push("/progress");
@@ -259,13 +262,15 @@ function MenuLink({
   title,
   sub,
   onPress,
+  testID,
 }: {
   title: string;
   sub: string;
   onPress: () => void;
+  testID?: string;
 }) {
   return (
-    <Pressable onPress={onPress} style={styles.nav}>
+    <Pressable onPress={onPress} style={styles.nav} testID={testID}>
       <Body>{title}</Body>
       <Muted style={{ marginTop: 2 }}>{sub}</Muted>
     </Pressable>
