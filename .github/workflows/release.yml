@@ -197,6 +197,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - uses: actions/checkout@v7
+
       - name: Download Android APK
         uses: actions/download-artifact@v7
         with:
