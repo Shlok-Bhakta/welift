@@ -28,7 +28,7 @@ npm run ios:e2e          # writes artifacts/e2e-demo.mp4
 scripts/upload-demo.sh artifacts/e2e-demo.mp4
 ```
 
-Agent skills live in `.agents/skills/demo-ios-story` and `skills/record-ios-demo`. Pull requests also get an automated iOS preview comment from `.github/workflows/ios-preview.yml`.
+Agent skills live in `.agents/skills/demo-ios-story` and `skills/record-ios-demo`. Every PR also gets installable builds from `.github/workflows/pr-preview.yml`: an ephemeral `pr-<n>` prerelease (APK + unsigned IPA) with an Autoloader install bot comment.
 
 ## Data
 
@@ -40,10 +40,13 @@ Agent skills live in `.agents/skills/demo-ios-story` and `skills/record-ios-demo
 
 ## Releases
 
-Run the **Unsigned builds** GitHub Action (workflow dispatch or `v*` tag).
+Tagless semantic releases off `main` (`.github/workflows/release.yml`):
 
-Artifacts (attached to a GitHub Release):
-- `welift-android.apk` — debug-signed release APK (sideloadable, no Play keystore)
-- `welift-ios-unsigned.ipa` — unsigned device IPA (not installable on stock iOS without signing)
+- Title your PR `fix: ...` (patch), `feat: ...` (minor), or `feat!: ...` (major) and squash-merge. Any other title builds nothing.
+- Each release title publishes a moving `main-latest` prerelease with stable URLs:
+  - `.../releases/download/main-latest/welift-android.apk` — debug-signed release APK (sideloadable, no Play keystore)
+  - `.../releases/download/main-latest/welift-ios-unsigned.ipa` — unsigned device IPA (Autoloader signs it on-device)
+- iPhone install: open the Autoloader shim link from the release notes in Safari.
+- Manual fallback: run the **Tagless release** GitHub Action (workflow dispatch) to rebuild `main-latest` on demand.
 
-No Expo/`EXPO_TOKEN` required for that workflow.
+No Expo/`EXPO_TOKEN` required for any of this.

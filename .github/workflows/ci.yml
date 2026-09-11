@@ -6,6 +6,13 @@ on:
   pull_request:
 
 jobs:
+  release-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test semantic versioning
+        run: python3 scripts/test-semantic-version.py
+
   typecheck:
     runs-on: ubuntu-latest
     steps:

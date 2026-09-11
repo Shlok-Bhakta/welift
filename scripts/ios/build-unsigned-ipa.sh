@@ -16,6 +16,12 @@ fi
 workspace="$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)"
 scheme="$(basename "$workspace" .xcworkspace)"
 
+# Optional semantic version stamps from CI (release automation).
+# Local builds leave these unset and keep app.json values.
+version_args=()
+[[ -n "${MARKETING_VERSION:-}" ]] && version_args+=(MARKETING_VERSION="$MARKETING_VERSION")
+[[ -n "${CURRENT_PROJECT_VERSION:-}" ]] && version_args+=(CURRENT_PROJECT_VERSION="$CURRENT_PROJECT_VERSION")
+
 xcodebuild \
   -workspace "$workspace" \
   -scheme "$scheme" \
@@ -26,6 +32,7 @@ xcodebuild \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \
   CODE_SIGN_IDENTITY='' \
+  "${version_args[@]}" \
   build
 
 app_path="$(find "$derived_data/Build/Products/Release-iphoneos" -maxdepth 1 -name '*.app' -print -quit)"

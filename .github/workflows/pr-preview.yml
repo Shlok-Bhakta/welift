@@ -1,0 +1,234 @@
+name: PR preview
+
+# Every PR branch gets installable builds: Android APK + unsigned iOS IPA,
+# published to an ephemeral `pr-<n>` prerelease with an Autoloader install bot.
+# Merges to main are built separately by `release.yml` (tagless semantic).
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: pr-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android APK
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Stamp build number
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path("app.json")
+          data = json.loads(p.read_text())
+          data["expo"]["android"]["versionCode"] = int(os.environ["RUN_NUMBER"])
+          p.write_text(json.dumps(data, indent=2) + "\n")
+          PY
+
+      - name: Prebuild Android
+        run: npx expo prebuild --platform android --non-interactive --clean
+
+      - name: Build APK (debug-signed, no Play keystore)
+        working-directory: android
+        run: |
+          set -euo pipefail
+          # Point release at the debug keystore so we get a release APK without secrets
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("app/build.gradle")
+          text = p.read_text()
+          if "signingConfig signingConfigs.debug" not in text:
+              text = text.replace(
+                  "buildTypes {",
+                  "buildTypes {\n        // CI: unsigned/dev-friendly APK\n",
+                  1,
+              )
+              text = text.replace(
+                  "release {\n",
+                  "release {\n            signingConfig signingConfigs.debug\n",
+                  1,
+              )
+              p.write_text(text)
+          PY
+          ./gradlew :app:assembleRelease
+
+      - name: Collect APK
+        run: |
+          mkdir -p preview
+          APK=$(find android/app/build/outputs/apk -type f -name "*.apk" | head -n 1)
+          echo "Found: $APK"
+          cp "$APK" preview/welift-android.apk
+          ls -lh preview/
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pr-android
+          path: preview/welift-android.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  ios:
+    name: iOS IPA + demo
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci --legacy-peer-deps
+      - name: Install Maestro
+        env:
+          MAESTRO_VERSION: 2.8.0
+        run: |
+          curl -Ls https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Install FFmpeg when absent
+        run: command -v ffmpeg >/dev/null || brew install ffmpeg
+      - name: Run and record iOS acceptance test
+        run: npm run ios:e2e
+      - name: Build unsigned IPA
+        env:
+          CURRENT_PROJECT_VERSION: ${{ github.run_number }}
+        run: npm run ios:ipa
+      - name: Upload iOS artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: pr-ios
+          path: |
+            artifacts/welift-ios-unsigned.ipa
+            artifacts/e2e-demo.mp4
+          if-no-files-found: error
+          retention-days: 14
+
+  preview:
+    name: Publish preview + bot comment
+    needs: [android, ios]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download Android APK
+        uses: actions/download-artifact@v7
+        with:
+          name: pr-android
+          path: assets
+
+      - name: Download iOS artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: pr-ios
+          path: assets
+
+      - name: Publish prerelease
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          TAG="pr-${PR_NUMBER}"
+          IPA_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${TAG}/welift-ios-unsigned.ipa"
+          APK_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${TAG}/welift-android.apk"
+          SHIM_URL="https://marginally-better-apps.github.io/Autoloader/?url=$(python3 -c 'from urllib.parse import quote; print(quote("'"${IPA_URL}"'", safe=""))')"
+
+          gh release delete "${TAG}" --yes --cleanup-tag || true
+          gh release create "${TAG}" assets/welift-ios-unsigned.ipa assets/welift-android.apk \
+            --prerelease \
+            --latest=false \
+            --target "${HEAD_SHA}" \
+            --title "PR #${PR_NUMBER} preview" \
+            --notes "Preview build for https://github.com/${GITHUB_REPOSITORY}/pull/${PR_NUMBER} (${HEAD_SHA:0:7}). iPhone: open ${SHIM_URL} in Safari. Android: download welift-android.apk below and sideload it."
+
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "ipa-url=${IPA_URL}" >> "$GITHUB_OUTPUT"
+          echo "apk-url=${APK_URL}" >> "$GITHUB_OUTPUT"
+          echo "shim-url=${SHIM_URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload demo to Planista
+        id: demo
+        continue-on-error: true
+        run: |
+          demo_url="$(curl --fail-with-body -sS --retry 3 --retry-all-errors --retry-delay 2 --connect-timeout 20 --max-time 120 -H 'Content-Type: video/mp4' --data-binary @assets/e2e-demo.mp4 https://planista.shloklab.us/)" || demo_url=""
+          echo "url=$demo_url" >> "$GITHUB_OUTPUT"
+
+      - name: Update PR preview comment
+        uses: actions/github-script@v9
+        env:
+          DEMO_URL: ${{ steps.demo.outputs.url }}
+          IPA_URL: ${{ steps.release.outputs.ipa-url }}
+          APK_URL: ${{ steps.release.outputs.apk-url }}
+          SHIM_URL: ${{ steps.release.outputs.shim-url }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        with:
+          script: |
+            const marker = '<!-- autoloader-pr-preview -->';
+            const demoLine = process.env.DEMO_URL
+              ? `- [Watch the recorded Maestro acceptance flow](${process.env.DEMO_URL})`
+              : `- Maestro demo upload failed for this run — install links below still work.`;
+            const body = `${marker}
+            ## Install this PR on a phone
+
+            - **iPhone:** [Open in Autoloader](${process.env.SHIM_URL})
+
+            GitHub will not make \`autoloader://\` tappable, so that link is HTTPS and bounces into Autoloader. If you are in the GitHub app and nothing happens, open it in Safari.
+
+            - **Android:** [Download welift-android.apk](${process.env.APK_URL}), then sideload it.
+            - Direct files: [IPA](${process.env.IPA_URL}) · [APK](${process.env.APK_URL})
+            ${demoLine}
+
+            _Built from \`${process.env.HEAD_SHA.slice(0, 7)}\`._`;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const previous = comments.find((comment) =>
+              comment.user.type === 'Bot' && comment.body.includes(marker)
+            );
+            const params = {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            };
+            if (previous) {
+              await github.rest.issues.updateComment({ ...params, comment_id: previous.id });
+            } else {
+              await github.rest.issues.createComment({ ...params, issue_number: context.issue.number });
+            }
