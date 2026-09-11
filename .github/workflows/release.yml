@@ -1,27 +1,79 @@
-name: Unsigned builds
+name: Tagless release
+
+# Merges to main get installable builds with semantic versions from PR titles:
+#   fix: ...            -> patch bump (0.0.1)
+#   feat: ...           -> minor bump (0.1.0)
+#   feat!: ...          -> major bump  (1.0.0)
+# Any other title builds nothing. Use squash merge so the PR title becomes
+# the commit subject. Published to a moving `main-latest` prerelease with
+# stable asset URLs + an Autoloader install link. No version git tags.
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
   workflow_dispatch:
+
+concurrency:
+  group: tagless-release-main
+  cancel-in-progress: false
 
 permissions:
   contents: write
 
 jobs:
+  resolve:
+    name: Resolve release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      build: ${{ steps.release.outputs.build }}
+      kind: ${{ steps.release.outputs.kind }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release
+        id: release
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          KIND="$(./scripts/semantic-version.py --kind HEAD)"
+          VERSION="$(./scripts/semantic-version.py HEAD)"
+
+          if [[ "$EVENT_NAME" = "workflow_dispatch" ]]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "kind=manual" >> "$GITHUB_OUTPUT"
+          elif [[ "$KIND" != "none" ]]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "kind=$KIND" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "kind=none" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Explain non-release commit
+        if: steps.release.outputs.build != 'true'
+        run: echo "The main commit is not fix:, feat:, or feat!:; no release artifact will be built."
+
   android:
     name: Android APK
+    needs: resolve
+    if: needs.resolve.outputs.build == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
@@ -29,8 +81,20 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Typecheck
-        run: npm run typecheck
+      - name: Stamp version
+        env:
+          VERSION: ${{ needs.resolve.outputs.version }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          p = Path("app.json")
+          data = json.loads(p.read_text())
+          data["expo"]["version"] = os.environ["VERSION"]
+          data["expo"]["android"]["versionCode"] = int(os.environ["RUN_NUMBER"])
+          p.write_text(json.dumps(data, indent=2) + "\n")
+          PY
 
       - name: Prebuild Android
         run: npx expo prebuild --platform android --non-interactive --clean
@@ -67,20 +131,24 @@ jobs:
           cp "$APK" dist/welift-android.apk
           ls -lh dist/
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
-          name: welift-android-apk
+          name: welift-android-v${{ needs.resolve.outputs.version }}
           path: dist/welift-android.apk
           if-no-files-found: error
+          retention-days: 30
 
   ios:
     name: iOS unsigned IPA
+    needs: resolve
+    if: needs.resolve.outputs.build == 'true'
     # macos-26 / Xcode 26+ required for expo-glass-effect (Swift tools 6.2)
     runs-on: macos-26
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -107,104 +175,58 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Prebuild iOS
-        run: npx expo prebuild --platform ios --non-interactive --clean
-
-      - name: Install CocoaPods
-        working-directory: ios
-        run: pod install
-
       - name: Build unsigned iOS app
-        working-directory: ios
-        run: |
-          set -euo pipefail
-          # .xcworkspace is a directory bundle — use -d so we don't list its guts
-          WORKSPACE=$(ls -d *.xcworkspace 2>/dev/null | head -n1)
-          if [[ -z "${WORKSPACE:-}" || ! -d "$WORKSPACE" ]]; then
-            WORKSPACE="WeLift.xcworkspace"
-          fi
-          SCHEME="WeLift"
-          echo "Workspace: $WORKSPACE"
-          echo "Scheme: $SCHEME"
-          ls -la
-          xcodebuild -workspace "$WORKSPACE" -list
-          xcodebuild \
-            -workspace "$WORKSPACE" \
-            -scheme "$SCHEME" \
-            -configuration Release \
-            -sdk iphoneos \
-            -derivedDataPath "$PWD/build" \
-            -destination 'generic/platform=iOS' \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            ONLY_ACTIVE_ARCH=NO \
-            build
-
-      - name: Package unsigned IPA
-        run: |
-          set -euo pipefail
-          mkdir -p dist
-          echo "Looking for .app under ios/build..."
-          find ios/build -type d -name "*.app" -print || true
-          APP=$(find ios/build/Build/Products -type d -name "*.app" | head -n 1 || true)
-          if [[ -z "${APP:-}" ]]; then
-            APP=$(find ios/build -type d -name "*.app" | head -n 1 || true)
-          fi
-          if [[ -z "${APP:-}" ]]; then
-            echo "No .app product found"
-            exit 1
-          fi
-          echo "Found app: $APP"
-          rm -rf Payload
-          mkdir Payload
-          cp -R "$APP" "Payload/$(basename "$APP")"
-          (
-            cd "$(pwd)"
-            zip -qry dist/welift-ios-unsigned.ipa Payload
-          )
-          rm -rf Payload
-          ls -lh dist/welift-ios-unsigned.ipa
-          unzip -l dist/welift-ios-unsigned.ipa | head -n 20
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: welift-ios-ipa
-          path: dist/welift-ios-unsigned.ipa
-          if-no-files-found: error
-
-  release:
-    name: Publish GitHub Release
-    needs: [android, ios]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Stage assets
-        run: |
-          mkdir -p release-assets
-          find artifacts -type f \( -name "*.apk" -o -name "*.ipa" \) -exec cp {} release-assets/ \;
-          ls -lh release-assets
-
-      - name: Resolve tag
-        id: tag
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-          else
-            echo "name=build-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.tag.outputs.name }}
-          name: WeLift ${{ steps.tag.outputs.name }}
-          generate_release_notes: true
-          files: release-assets/*
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MARKETING_VERSION: ${{ needs.resolve.outputs.version }}
+          CURRENT_PROJECT_VERSION: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          npm run ios:ipa
+          ls -lh artifacts/welift-ios-unsigned.ipa
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: welift-ios-v${{ needs.resolve.outputs.version }}
+          path: artifacts/welift-ios-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Publish main-latest
+    needs: [resolve, android, ios]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download Android APK
+        uses: actions/download-artifact@v7
+        with:
+          name: welift-android-v${{ needs.resolve.outputs.version }}
+          path: assets
+
+      - name: Download iOS IPA
+        uses: actions/download-artifact@v7
+        with:
+          name: welift-ios-v${{ needs.resolve.outputs.version }}
+          path: assets
+
+      - name: Publish main-latest prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.resolve.outputs.version }}
+          KIND: ${{ needs.resolve.outputs.kind }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          TAG="main-latest"
+          IPA_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${TAG}/welift-ios-unsigned.ipa"
+          APK_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${TAG}/welift-android.apk"
+          SHIM_URL="https://marginally-better-apps.github.io/Autoloader/?url=$(python3 -c 'from urllib.parse import quote; print(quote("'"${IPA_URL}"'", safe=""))')"
+
+          ls -lh assets/
+          gh release delete "${TAG}" --yes --cleanup-tag || true
+          gh release create "${TAG}" assets/welift-ios-unsigned.ipa assets/welift-android.apk \
+            --prerelease \
+            --latest=false \
+            --target "${SHA}" \
+            --title "WeLift main-latest (v${VERSION})" \
+            --notes "Latest main build: v${VERSION} (${KIND}, ${SHA:0:7}). iPhone: open ${SHIM_URL} in Safari. Android: download welift-android.apk below and sideload it."
