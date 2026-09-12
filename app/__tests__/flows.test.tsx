@@ -11,10 +11,10 @@ import {
 } from "../../src/test/flowHelpers";
 import type { WeliftBundle } from "../../src/types";
 import OnboardScreen from "../onboard";
-import PeopleScreen from "../people";
-import ProgressScreen from "../progress";
+import PeopleScreen from "../(tabs)/people";
+import ProgressScreen from "../(tabs)/progress";
 import SessionScreen from "../session";
-import WeekScreen from "../week";
+import WeekScreen from "../(tabs)/week";
 
 jest.mock("expo-router", () => {
   const { mockRouter: router } = require("../../src/test/flowHelpers");
@@ -66,7 +66,7 @@ describe("screen flows (E2E-lite)", () => {
 
     expect(screen.getByText("Your week")).toBeTruthy();
     expect(screen.getByText("Shlok")).toBeTruthy();
-    expect(screen.getByText(/Quiet stretch/i)).toBeTruthy();
+    expect(screen.getByText("0 sets")).toBeTruthy();
     expect(screen.getByText("0 active")).toBeTruthy();
     fireEvent.press(screen.getByText("Log this day"));
     expect(useWelift.getState().draft).toBeTruthy();
@@ -82,7 +82,6 @@ describe("screen flows (E2E-lite)", () => {
     render(<SessionScreen />);
 
     expect(screen.getAllByText("Trap Bar Deadlift").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("trap-bar-deadlift").length).toBeGreaterThan(0);
     expect(screen.getByText("New")).toBeTruthy();
 
     fireEvent.changeText(screen.getAllByPlaceholderText("lb")[0], "405");

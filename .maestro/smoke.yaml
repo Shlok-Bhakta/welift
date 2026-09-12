@@ -67,4 +67,46 @@ name: Mint install and real progress chart
     timeout: 15000
 - assertVisible: "158 lb"
 - waitForAnimationToEnd
+# Bottom-bar tabs + bodyweight story acceptance
+- tapOn:
+    id: "people-tab"
+- extendedWaitUntil:
+    visible:
+      id: "bodyweight-input"
+    timeout: 15000
+- tapOn:
+    id: "bodyweight-input"
+- eraseText
+- inputText: "182"
+- tapOn: "Body weight"
+- tapOn:
+    id: "bodyweight-add"
+- extendedWaitUntil:
+    visible:
+      id: "people-latest-weight"
+    timeout: 10000
+- assertVisible:
+    id: "people-latest-weight"
+    text: ".*182 lb"
+- tapOn:
+    id: "progress-tab"
+- extendedWaitUntil:
+    visible:
+      id: "progress-tab-weight"
+    timeout: 15000
+- tapOn:
+    id: "progress-tab-weight"
+- extendedWaitUntil:
+    visible:
+      id: "progress-weight-chart"
+    timeout: 15000
+- assertVisible:
+    id: "progress-weight-value"
+    text: ".*182 lb"
+- tapOn:
+    id: "week-tab"
+- extendedWaitUntil:
+    visible: "Your week"
+    timeout: 15000
+- waitForAnimationToEnd
 - stopRecording

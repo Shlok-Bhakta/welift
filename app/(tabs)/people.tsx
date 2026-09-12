@@ -1,4 +1,3 @@
-import { router } from "expo-router";
 import { useState } from "react";
 import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -9,13 +8,12 @@ import {
   Display,
   Field,
   Mini,
-  Muted,
   Screen,
-} from "../src/components/ui";
-import { initials } from "../src/lib/format";
-import { pickWeliftBundle, shareWeliftBundle } from "../src/lib/share";
-import { useWelift } from "../src/store/welift";
-import { colors } from "../src/theme";
+} from "../../src/components/ui";
+import { initials } from "../../src/lib/format";
+import { pickWeliftBundle, shareWeliftBundle } from "../../src/lib/share";
+import { latestBodyWeightLb, useWelift } from "../../src/store/welift";
+import { colors } from "../../src/theme";
 
 export default function PeopleScreen() {
   const insets = useSafeAreaInsets();
@@ -37,28 +35,31 @@ export default function PeopleScreen() {
         }}
         keyboardShouldPersistTaps="handled"
       >
-        <Button label="Week" variant="line" small onPress={() => router.back()} />
         <Display style={{ fontSize: 40, marginTop: 10 }}>People</Display>
-        <Muted style={{ marginBottom: 8 }}>
-          UUID stays on their device. Re-import fully replaces that profile.
-        </Muted>
 
-        {Object.values(profiles).map((p) => (
-          <View key={p.id} style={styles.person}>
-            <View style={styles.av}>
-              <Body style={{ fontSize: 12 }}>{initials(p.name)}</Body>
+        {Object.values(profiles).map((p) => {
+          const latest = latestBodyWeightLb(p.id);
+          return (
+            <View key={p.id} style={styles.person}>
+              <View style={styles.av}>
+                <Body style={{ fontSize: 12 }}>{initials(p.name)}</Body>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Body>
+                  {p.name}
+                  {p.id === meId ? " · you" : ""}
+                </Body>
+                <Body
+                  testID="people-latest-weight"
+                  style={{ color: colors.muted, fontSize: 13 }}
+                >
+                  {`${p.sessions.length} sessions`}
+                  {latest != null ? ` · ${latest} lb` : ""}
+                </Body>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Body>
-                {p.name}
-                {p.id === meId ? " · you" : ""}
-              </Body>
-              <Muted>
-                {p.sessions.length} sessions · {p.id.slice(0, 8)}…
-              </Muted>
-            </View>
-          </View>
-        ))}
+          );
+        })}
 
         <Mini style={{ marginTop: 18 }}>Body weight</Mini>
         <View style={styles.row}>
@@ -68,6 +69,7 @@ export default function PeopleScreen() {
             value={bw}
             onChangeText={setBw}
             placeholder="185"
+            testID="bodyweight-input"
           />
           <Button
             label={unit}
@@ -79,6 +81,7 @@ export default function PeopleScreen() {
           <Button
             label="+"
             small
+            testID="bodyweight-add"
             onPress={() => {
               const v = Number(bw);
               if (!v) return;

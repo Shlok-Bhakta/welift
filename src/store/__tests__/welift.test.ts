@@ -4,8 +4,11 @@ import { dayKey } from "../../lib/format";
 import type { WeliftBundle } from "../../types";
 import {
   bestMetric,
+  bodyWeightDaySeries,
   dayLoad,
   exerciseDaySeries,
+  latestBodyWeightLb,
+  toLb,
   useWelift,
   weekLoads,
 } from "../welift";
@@ -288,6 +291,37 @@ describe("welift store", () => {
       const bw = useWelift.getState().me()!.bodyWeight;
       expect(bw).toHaveLength(before + 1);
       expect(bw[bw.length - 1]).toMatchObject({ value: 185.5, unit: "lb" });
+    });
+
+    it("toLb converts kg and passes lb through", () => {
+      expect(toLb(180, "lb")).toBe(180);
+      expect(toLb(82, "kg")).toBeCloseTo(180.78, 1);
+    });
+
+    it("bodyWeightDaySeries tracks last entry per day over 7 days", () => {
+      const meId = useWelift.getState().meId!;
+      const now = new Date();
+      const today = dayKey(now);
+
+      expect(
+        bodyWeightDaySeries(meId, now).filter((p) => p.value > 0)
+      ).toHaveLength(0);
+
+      useWelift.getState().logBodyWeight(180, "lb");
+      useWelift.getState().logBodyWeight(82, "kg");
+      const series = bodyWeightDaySeries(meId, now);
+      expect(series).toHaveLength(7);
+      expect(series.filter((p) => p.value > 0)).toHaveLength(1);
+      expect(series.find((p) => p.day === today)?.value).toBeCloseTo(180.8, 1);
+      expect(bodyWeightDaySeries("missing", now)).toEqual([]);
+    });
+
+    it("latestBodyWeightLb returns newest entry in lb or null", () => {
+      const meId = useWelift.getState().meId!;
+      expect(latestBodyWeightLb(meId)).toBeNull();
+      useWelift.getState().logBodyWeight(180, "lb");
+      useWelift.getState().logBodyWeight(82, "kg");
+      expect(latestBodyWeightLb(meId)).toBeCloseTo(180.8, 1);
     });
 
     it("bestMetric returns max Epley for weight lifts", () => {

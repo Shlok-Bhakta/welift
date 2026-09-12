@@ -464,4 +464,44 @@ export function bestMetric(
   return best;
 }
 
+export function toLb(value: number, unit: "lb" | "kg"): number {
+  return unit === "kg" ? value * 2.20462 : value;
+}
+
+/** Latest body-weight entry in lb, or null when none logged. */
+export function latestBodyWeightLb(profileId: string): number | null {
+  const p = useWelift.getState().profiles[profileId];
+  if (!p?.bodyWeight.length) return null;
+  const last = p.bodyWeight[p.bodyWeight.length - 1];
+  return Math.round(toLb(Number(last.value) || 0, last.unit) * 10) / 10;
+}
+
+/**
+ * Body-weight series over the rolling 7 days, normalized to lb.
+ * Last entry logged on a day wins; days without entries are 0.
+ */
+export function bodyWeightDaySeries(
+  profileId: string,
+  now = new Date()
+): Array<{ label: string; value: number; day: string }> {
+  const p = useWelift.getState().profiles[profileId];
+  if (!p) return [];
+
+  const byDay = new Map<string, number>();
+  for (const entry of p.bodyWeight) {
+    const dk = dayKey(entry.date);
+    byDay.set(dk, toLb(Number(entry.value) || 0, entry.unit));
+  }
+
+  return rollingDays(now).map((d) => {
+    const dk = dayKey(d);
+    const label = d.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+    const raw = byDay.get(dk) ?? 0;
+    return { label, value: Math.round(raw * 10) / 10, day: dk };
+  });
+}
+
 export { COMMON_EXERCISES, rollingDays, startOfDay, dayKey };
