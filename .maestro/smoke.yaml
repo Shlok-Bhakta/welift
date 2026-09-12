@@ -78,8 +78,11 @@ name: Mint install and real progress chart
     id: "bodyweight-input"
 - eraseText
 - inputText: "182"
-- tapOn: "+"
-- assertVisible: "182 lb"
+- tapOn:
+    id: "bodyweight-add"
+- extendedWaitUntil:
+    visible: "182 lb"
+    timeout: 10000
 - tapOn:
     id: "progress-tab"
 - extendedWaitUntil:
