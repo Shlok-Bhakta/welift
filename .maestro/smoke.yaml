@@ -78,6 +78,7 @@ name: Mint install and real progress chart
     id: "bodyweight-input"
 - eraseText
 - inputText: "182"
+- hideKeyboard
 - tapOn:
     id: "bodyweight-add"
 - extendedWaitUntil:
