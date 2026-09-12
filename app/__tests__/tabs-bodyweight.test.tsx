@@ -22,8 +22,15 @@ jest.mock("expo-router", () => {
   const ReactActual = require("react");
   const { View: RNView } = require("react-native");
   const { mockRouter: router } = require("../../src/test/flowHelpers");
-  const Screen = ({ name }: { name: string }) =>
-    ReactActual.createElement(RNView, { testID: `tab-${name}` });
+  const Screen = ({ name, options }: { name: string; options?: { tabBarButtonTestID?: string } }) =>
+    ReactActual.createElement(
+      ReactActual.Fragment,
+      null,
+      ReactActual.createElement(RNView, { testID: `tab-${name}` }),
+      options?.tabBarButtonTestID
+        ? ReactActual.createElement(RNView, { testID: options.tabBarButtonTestID })
+        : null
+    );
   const Tabs = ({ children }: { children?: React.ReactNode }) =>
     ReactActual.createElement(ReactActual.Fragment, null, children);
   (Tabs as unknown as Record<string, unknown>).Screen = Screen;
@@ -43,6 +50,9 @@ describe("bottom-tab navigation regression", () => {
     expect(screen.getByTestId("tab-week")).toBeTruthy();
     expect(screen.getByTestId("tab-progress")).toBeTruthy();
     expect(screen.getByTestId("tab-people")).toBeTruthy();
+    expect(screen.getByTestId("week-tab")).toBeTruthy();
+    expect(screen.getByTestId("progress-tab")).toBeTruthy();
+    expect(screen.getByTestId("people-tab")).toBeTruthy();
   });
 
   it("week has no sidebar drawer or hamburger", () => {

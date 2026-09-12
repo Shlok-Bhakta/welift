@@ -16,9 +16,15 @@ export default function TabsLayout() {
         tabBarLabelStyle: { fontSize: 12 },
       }}
     >
-      <Tabs.Screen name="week" options={{ title: "Week" }} />
-      <Tabs.Screen name="progress" options={{ title: "Progress" }} />
-      <Tabs.Screen name="people" options={{ title: "People" }} />
+      <Tabs.Screen name="week" options={{ title: "Week", tabBarButtonTestID: "week-tab" }} />
+      <Tabs.Screen
+        name="progress"
+        options={{ title: "Progress", tabBarButtonTestID: "progress-tab" }}
+      />
+      <Tabs.Screen
+        name="people"
+        options={{ title: "People", tabBarButtonTestID: "people-tab" }}
+      />
     </Tabs>
   );
 }
