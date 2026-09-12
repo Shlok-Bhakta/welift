@@ -49,7 +49,10 @@ export default function PeopleScreen() {
                   {p.name}
                   {p.id === meId ? " · you" : ""}
                 </Body>
-                <Body style={{ color: colors.muted, fontSize: 13 }}>
+                <Body
+                  testID="people-latest-weight"
+                  style={{ color: colors.muted, fontSize: 13 }}
+                >
                   {`${p.sessions.length} sessions`}
                   {latest != null ? ` · ${latest} lb` : ""}
                 </Body>

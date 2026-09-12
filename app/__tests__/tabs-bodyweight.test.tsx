@@ -139,5 +139,6 @@ describe("body-weight chart regression", () => {
     useWelift.getState().logBodyWeight(190, "lb");
     render(<PeopleScreen />);
     expect(screen.getByText(/0 sessions · 190 lb/)).toBeTruthy();
+    expect(screen.getByTestId("people-latest-weight")).toBeTruthy();
   });
 });

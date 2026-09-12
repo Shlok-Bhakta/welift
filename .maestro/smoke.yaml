@@ -82,8 +82,12 @@ name: Mint install and real progress chart
 - tapOn:
     id: "bodyweight-add"
 - extendedWaitUntil:
-    visible: "182 lb"
+    visible:
+      id: "people-latest-weight"
     timeout: 10000
+- assertVisible:
+    id: "people-latest-weight"
+    text: ".*182 lb"
 - tapOn:
     id: "progress-tab"
 - extendedWaitUntil:
@@ -96,7 +100,9 @@ name: Mint install and real progress chart
     visible:
       id: "progress-weight-chart"
     timeout: 15000
-- assertVisible: "182 lb"
+- assertVisible:
+    id: "progress-weight-value"
+    text: ".*182 lb"
 - tapOn:
     id: "week-tab"
 - extendedWaitUntil:
