@@ -6,7 +6,7 @@ name: PR preview
 
 on:
   pull_request:
-    branches: [main]
+    # Any base branch, including stacked PRs (not only main).
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
