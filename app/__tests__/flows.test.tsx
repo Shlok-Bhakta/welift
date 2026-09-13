@@ -44,6 +44,7 @@ describe("screen flows (E2E-lite)", () => {
 
   it("onboard rejects empty name and opens week with a profile", () => {
     render(<OnboardScreen />);
+    expect(screen.getByText("WeLift")).toBeTruthy();
     expect(screen.getByText("Enter your name")).toBeTruthy();
     expect(screen.getByText("Next")).toBeTruthy();
 

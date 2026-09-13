@@ -30,7 +30,7 @@ test.describe("WeLift web smoke", () => {
     const search = page.getByPlaceholder("Search or create…");
     await expect(search).toBeVisible();
     await search.fill("E2E Smoke Lift");
-    await page.getByText("Create from search").click({ force: true });
+    await page.getByTestId("create-from-search").click({ force: true });
 
     await expect(page.getByPlaceholder("lb").first()).toBeVisible({
       timeout: 15_000,
@@ -62,17 +62,15 @@ test.describe("WeLift web smoke", () => {
       timeout: 30_000,
     });
 
-    await page.getByText("People", { exact: true }).click();
+    await page.getByTestId("people-tab").click({ force: true });
     await expect(page.getByText("Export", { exact: true })).toBeVisible();
     await expect(page.getByText("Import", { exact: true })).toBeVisible();
 
-    await page.getByText("Week", { exact: true }).click();
+    await page.getByTestId("week-tab").click({ force: true });
     await expect(page.getByText("Your week").first()).toBeVisible();
 
-    await page.getByText("Progress", { exact: true }).click();
-    await expect(
-      page.getByText("Progress", { exact: true }).first()
-    ).toBeVisible();
+    await page.getByTestId("progress-tab").click({ force: true });
+    await expect(page.getByTestId("progress-heading")).toBeVisible();
     await expect(page.getByTestId("progress-empty")).toBeVisible();
   });
 });
