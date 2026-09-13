@@ -23,6 +23,18 @@ import {
 
 import { colors, radius, space, type } from "../theme";
 
+function haptic(kind: "selection" | "impact") {
+  try {
+    const run =
+      kind === "selection"
+        ? Haptics.selectionAsync()
+        : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void Promise.resolve(run).catch(() => undefined);
+  } catch {
+    // Web / unsupported platforms — never surface as a LogBox toast.
+  }
+}
+
 export function useWeliftFonts() {
   return useFonts({
     BebasNeue_400Regular,
@@ -93,9 +105,7 @@ export function Chip({ label, active, style, onPress, ...rest }: ChipProps) {
       accessibilityRole="button"
       accessibilityState={{ selected: !!active }}
       onPress={(e) => {
-        if (active == null || !active) {
-          void Haptics.selectionAsync().catch(() => undefined);
-        }
+        if (active == null || !active) haptic("selection");
         onPress?.(e);
       }}
       style={({ pressed }) => [
@@ -141,9 +151,7 @@ export function Button({
           : undefined
       }
       onPress={(e) => {
-        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-          () => undefined
-        );
+        haptic("impact");
         onPress?.(e);
       }}
       style={({ pressed }) => [

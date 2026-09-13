@@ -406,7 +406,8 @@ export default function SessionScreen() {
 
             {canCreate ? (
               <Button
-                label={`Create “${query.trim()}”`}
+                label="Create from search"
+                testID="create-from-search"
                 style={{ marginTop: 14 }}
                 onPress={() => {
                   const n = query.trim();

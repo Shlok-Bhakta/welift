@@ -4,6 +4,14 @@ import * as Haptics from "expo-haptics";
 import { TabIcon } from "../../src/components/TabIcon";
 import { colors, type } from "../../src/theme";
 
+function tabHaptic() {
+  try {
+    void Promise.resolve(Haptics.selectionAsync()).catch(() => undefined);
+  } catch {
+    // ignore unsupported platforms
+  }
+}
+
 export default function TabsLayout() {
   return (
     <Tabs
@@ -26,7 +34,7 @@ export default function TabsLayout() {
       }}
       screenListeners={{
         tabPress: () => {
-          void Haptics.selectionAsync().catch(() => undefined);
+          tabHaptic();
         },
       }}
     >
