@@ -3,6 +3,7 @@ import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
+  Avatar,
   Body,
   Button,
   Display,
@@ -13,7 +14,7 @@ import {
 import { initials } from "../../src/lib/format";
 import { pickWeliftBundle, shareWeliftBundle } from "../../src/lib/share";
 import { latestBodyWeightLb, useWelift } from "../../src/store/welift";
-import { colors } from "../../src/theme";
+import { colors, space, type } from "../../src/theme";
 
 export default function PeopleScreen() {
   const insets = useSafeAreaInsets();
@@ -29,21 +30,19 @@ export default function PeopleScreen() {
     <Screen>
       <ScrollView
         contentContainerStyle={{
-          paddingTop: insets.top + 12,
-          paddingBottom: insets.bottom + 28,
-          paddingHorizontal: 16,
+          paddingTop: insets.top + space.md,
+          paddingBottom: space.xxl,
+          paddingHorizontal: space.lg,
         }}
         keyboardShouldPersistTaps="handled"
       >
-        <Display style={{ fontSize: 40, marginTop: 10 }}>People</Display>
+        <Display style={{ fontSize: type.displayLg, marginTop: 10 }}>People</Display>
 
         {Object.values(profiles).map((p) => {
           const latest = latestBodyWeightLb(p.id);
           return (
             <View key={p.id} style={styles.person}>
-              <View style={styles.av}>
-                <Body style={{ fontSize: 12 }}>{initials(p.name)}</Body>
-              </View>
+              <Avatar label={initials(p.name)} />
               <View style={{ flex: 1 }}>
                 <Body>
                   {p.name}
@@ -51,7 +50,7 @@ export default function PeopleScreen() {
                 </Body>
                 <Body
                   testID="people-latest-weight"
-                  style={{ color: colors.muted, fontSize: 13 }}
+                  style={{ color: colors.muted, fontSize: type.bodySm }}
                 >
                   {`${p.sessions.length} sessions`}
                   {latest != null ? ` · ${latest} lb` : ""}
@@ -70,6 +69,7 @@ export default function PeopleScreen() {
             onChangeText={setBw}
             placeholder="185"
             testID="bodyweight-input"
+            accessibilityLabel="Body weight"
           />
           <Button
             label={unit}
@@ -77,14 +77,19 @@ export default function PeopleScreen() {
             small
             onPress={() => setUnit((u) => (u === "lb" ? "kg" : "lb"))}
             style={{ minWidth: 56 }}
+            accessibilityLabel={`Unit ${unit}`}
           />
           <Button
             label="+"
             small
             testID="bodyweight-add"
+            accessibilityLabel="Add body weight"
             onPress={() => {
               const v = Number(bw);
-              if (!v) return;
+              if (!v) {
+                Alert.alert("Enter a weight");
+                return;
+              }
               logBodyWeight(v, unit);
               setBw("");
             }}
@@ -132,24 +137,15 @@ const styles = StyleSheet.create({
   person: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingVertical: 12,
+    gap: space.md,
+    paddingVertical: space.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.line,
-  },
-  av: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: "center",
-    justifyContent: "center",
   },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginTop: 8,
+    gap: space.sm,
+    marginTop: space.sm,
   },
 });

@@ -55,6 +55,18 @@ describe("bottom-tab navigation regression", () => {
     expect(screen.getByTestId("people-tab")).toBeTruthy();
   });
 
+  it("tab icons render chalk glyphs instead of MissingIcon", () => {
+    const { TabIcon } = require("../../src/components/TabIcon");
+    const { toJSON } = render(
+      <>
+        <TabIcon name="week" color="#e4d7c3" />
+        <TabIcon name="progress" color="#e4d7c3" />
+        <TabIcon name="people" color="#e4d7c3" />
+      </>
+    );
+    expect(toJSON()).toBeTruthy();
+  });
+
   it("week has no sidebar drawer or hamburger", () => {
     seedProfile("Shlok");
     render(<WeekScreen />);

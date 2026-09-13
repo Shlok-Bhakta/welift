@@ -8,6 +8,9 @@ import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Body,
   Button,
+  Chip,
   Display,
   Field,
   Mini,
@@ -29,7 +33,7 @@ import { COMMON_EXERCISES, commonMode } from "../src/lib/exercises";
 import { fmtDuration, slugify } from "../src/lib/format";
 import { useWelift } from "../src/store/welift";
 import type { ExerciseMode } from "../src/types";
-import { colors } from "../src/theme";
+import { colors, radius, space, type } from "../src/theme";
 
 export default function SessionScreen() {
   const insets = useSafeAreaInsets();
@@ -54,6 +58,7 @@ export default function SessionScreen() {
   const sheetRef = useRef<BottomSheetModal>(null);
   const [query, setQuery] = useState("");
   const snapPoints = useMemo(() => ["72%"], []);
+  const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (!draft) router.replace("/week");
@@ -63,6 +68,25 @@ export default function SessionScreen() {
     const id = setInterval(() => tickDraft(), 400);
     return () => clearInterval(id);
   }, [tickDraft]);
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 0.35,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
 
   const renderBackdrop = useCallback(
     (props: any) => (
@@ -96,219 +120,198 @@ export default function SessionScreen() {
     return !q || name.toLowerCase().includes(q) || key.includes(q);
   };
 
+  const finish = () => {
+    saveDraft();
+    router.replace("/week");
+  };
+
   if (!draft) return null;
+
+  const canCreate = query.trim().length > 0;
 
   return (
     <BottomSheetModalProvider>
       <Screen>
-        <ScrollView
-          contentContainerStyle={{
-            paddingTop: insets.top + 12,
-            paddingBottom: insets.bottom + 32,
-            paddingHorizontal: 16,
-          }}
-          keyboardShouldPersistTaps="handled"
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          keyboardVerticalOffset={insets.top}
         >
-          <View style={styles.topbar}>
-            <Button
-              label="Close"
-              variant="line"
-              small
-              onPress={() => {
-                saveDraft();
-                router.replace("/week");
-              }}
-            />
-            <View style={[styles.liveRow, styles.livePill]}>
-              <View style={styles.liveDot} />
-              <Muted>{editingId ? "Editing" : "New"}</Muted>
-            </View>
-            <Button
-              label="Save"
-              testID="session-save"
-              small
-              onPress={() => {
-                saveDraft();
-                router.replace("/week");
-              }}
-            />
-          </View>
-
-          <Mini style={{ marginTop: 12 }}>
-            {new Date(draft.startedAt).toLocaleDateString(undefined, {
-              weekday: "long",
-              month: "short",
-              day: "numeric",
-            })}
-          </Mini>
-          <Display style={styles.timer}>{fmtDuration(draft.durationSec || 0)}</Display>
-
-          <Button
-            label="Add exercise"
-            testID="add-exercise"
-            style={{ marginTop: 14, marginBottom: 8 }}
-            onPress={() => sheetRef.current?.present()}
-          />
-
-          {draft.exercises.length === 0 ? (
-            <View style={{ marginTop: 8, gap: 8 }}>
-              <Mini>Quick add</Mini>
-              {["Deadlift", "Squat", "Bench Press"].map((name) => {
-                const key = slugify(name);
-                return (
-                  <Button
-                    key={key}
-                    label={name}
-                    variant="line"
-                    testID={`quick-add-${key}`}
-                    onPress={() => addExercise(name, commonMode(key))}
-                  />
-                );
-              })}
-            </View>
-          ) : (
-            draft.exercises.map((e) => (
-              <View key={e.key} style={styles.exblock}>
-                <View style={styles.topbar}>
-                  <View style={{ flex: 1 }}>
-                    <Body>{e.name}</Body>
-                  </View>
-                  <Button
-                    label="Remove"
-                    variant="line"
-                    small
-                    onPress={() => removeExercise(e.key)}
-                  />
-                </View>
-
-                <View style={styles.modeRow}>
-                  <Pressable
-                    onPress={() => setExerciseMode(e.key, "weight")}
-                    style={[
-                      styles.modeBtn,
-                      e.mode === "weight" && styles.modeOn,
-                    ]}
-                  >
-                    <Body
-                      style={{
-                        fontSize: 12,
-                        color:
-                          e.mode === "weight" ? colors.accentInk : colors.muted,
-                      }}
-                    >
-                      Weight × reps
-                    </Body>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setExerciseMode(e.key, "time")}
-                    style={[
-                      styles.modeBtn,
-                      e.mode === "time" && styles.modeOn,
-                    ]}
-                  >
-                    <Body
-                      style={{
-                        fontSize: 12,
-                        color:
-                          e.mode === "time" ? colors.accentInk : colors.muted,
-                      }}
-                    >
-                      Time based
-                    </Body>
-                  </Pressable>
-                </View>
-
-                {e.sets.map((set, i) => (
-                  <View key={i} style={styles.setrow}>
-                    <Muted style={styles.setN}>{i + 1}</Muted>
-                    {e.mode === "time" && set.kind === "time" ? (
-                      <>
-                        <Field
-                          style={styles.setField}
-                          keyboardType="number-pad"
-                          value={String(set.minutes ?? "")}
-                          onChangeText={(t) =>
-                            updateSet(e.key, i, {
-                              minutes: t === "" ? "" : Number(t),
-                            })
-                          }
-                          placeholder="min"
-                        />
-                        <Field
-                          style={styles.setField}
-                          keyboardType="number-pad"
-                          value={String(set.seconds ?? "")}
-                          onChangeText={(t) =>
-                            updateSet(e.key, i, {
-                              seconds: t === "" ? "" : Number(t),
-                            })
-                          }
-                          placeholder="sec"
-                        />
-                      </>
-                    ) : set.kind === "weight" ? (
-                      <>
-                        <Field
-                          style={styles.setField}
-                          keyboardType="decimal-pad"
-                          value={String(set.weight ?? "")}
-                          onChangeText={(t) =>
-                            updateSet(e.key, i, {
-                              weight: t === "" ? "" : Number(t),
-                            })
-                          }
-                          placeholder="lb"
-                        />
-                        <Field
-                          style={styles.setField}
-                          keyboardType="number-pad"
-                          value={String(set.reps ?? "")}
-                          onChangeText={(t) =>
-                            updateSet(e.key, i, {
-                              reps: t === "" ? "" : Number(t),
-                            })
-                          }
-                          placeholder="reps"
-                        />
-                      </>
-                    ) : null}
-                    <Pressable
-                      onPress={() => removeSet(e.key, i)}
-                      style={styles.ghostX}
-                    >
-                      <Body style={{ color: colors.muted }}>×</Body>
-                    </Pressable>
-                  </View>
-                ))}
-
-                <Button
-                  label="+ same as last"
-                  style={{ marginTop: 10 }}
-                  onPress={() => duplicateSet(e.key)}
-                />
+          <ScrollView
+            contentContainerStyle={{
+              paddingTop: insets.top + space.md,
+              paddingBottom: insets.bottom + 32,
+              paddingHorizontal: space.lg,
+            }}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.topbar}>
+              <Button label="Close" variant="line" small onPress={finish} />
+              <View style={[styles.liveRow, styles.livePill]}>
+                <Animated.View style={[styles.liveDot, { opacity: pulse }]} />
+                <Muted>{editingId ? "Editing" : "New"}</Muted>
               </View>
-            ))
-          )}
+              <Button label="Save" testID="session-save" small onPress={finish} />
+            </View>
 
-          <Button
-            label="Delete session"
-            variant="hot"
-            style={{ marginTop: 20 }}
-            onPress={() =>
-              Alert.alert("Delete this session?", undefined, [
-                { text: "Cancel", style: "cancel" },
-                {
-                  text: "Delete",
-                  style: "destructive",
-                  onPress: () => {
-                    deleteDraft();
-                    router.replace("/week");
-                  },
-                },
-              ])
-            }
-          />
-        </ScrollView>
+            <Mini style={{ marginTop: space.md }}>
+              {new Date(draft.startedAt).toLocaleDateString(undefined, {
+                weekday: "long",
+                month: "short",
+                day: "numeric",
+              })}
+            </Mini>
+            <Display style={styles.timer}>{fmtDuration(draft.durationSec || 0)}</Display>
+
+            <Button
+              label="Add exercise"
+              testID="add-exercise"
+              style={{ marginTop: 14, marginBottom: 8 }}
+              onPress={() => sheetRef.current?.present()}
+            />
+
+            {draft.exercises.length === 0 ? (
+              <View style={{ marginTop: 8, gap: 8 }}>
+                <Mini>Quick add</Mini>
+                {["Deadlift", "Squat", "Bench Press"].map((name) => {
+                  const key = slugify(name);
+                  return (
+                    <Button
+                      key={key}
+                      label={name}
+                      variant="line"
+                      testID={`quick-add-${key}`}
+                      onPress={() => addExercise(name, commonMode(key))}
+                    />
+                  );
+                })}
+              </View>
+            ) : (
+              draft.exercises.map((e) => (
+                <View key={e.key} style={styles.exblock}>
+                  <View style={styles.topbar}>
+                    <View style={{ flex: 1 }}>
+                      <Body>{e.name}</Body>
+                    </View>
+                    <Button
+                      label="Remove"
+                      variant="line"
+                      small
+                      onPress={() => removeExercise(e.key)}
+                    />
+                  </View>
+
+                  <View style={styles.modeRow}>
+                    <Chip
+                      label="Weight × reps"
+                      active={e.mode === "weight"}
+                      onPress={() => setExerciseMode(e.key, "weight")}
+                      style={{ flex: 1 }}
+                    />
+                    <Chip
+                      label="Time based"
+                      active={e.mode === "time"}
+                      onPress={() => setExerciseMode(e.key, "time")}
+                      style={{ flex: 1 }}
+                    />
+                  </View>
+
+                  {e.sets.map((set, i) => (
+                    <View key={i} style={styles.setrow}>
+                      <Muted style={styles.setN}>{i + 1}</Muted>
+                      {e.mode === "time" && set.kind === "time" ? (
+                        <>
+                          <Field
+                            style={styles.setField}
+                            keyboardType="number-pad"
+                            value={String(set.minutes ?? "")}
+                            onChangeText={(t) =>
+                              updateSet(e.key, i, {
+                                minutes: t === "" ? "" : Number(t),
+                              })
+                            }
+                            placeholder="min"
+                          />
+                          <Field
+                            style={styles.setField}
+                            keyboardType="number-pad"
+                            value={String(set.seconds ?? "")}
+                            onChangeText={(t) =>
+                              updateSet(e.key, i, {
+                                seconds: t === "" ? "" : Number(t),
+                              })
+                            }
+                            placeholder="sec"
+                          />
+                        </>
+                      ) : set.kind === "weight" ? (
+                        <>
+                          <Field
+                            style={styles.setField}
+                            keyboardType="decimal-pad"
+                            value={String(set.weight ?? "")}
+                            onChangeText={(t) =>
+                              updateSet(e.key, i, {
+                                weight: t === "" ? "" : Number(t),
+                              })
+                            }
+                            placeholder="lb"
+                          />
+                          <Field
+                            style={styles.setField}
+                            keyboardType="number-pad"
+                            value={String(set.reps ?? "")}
+                            onChangeText={(t) =>
+                              updateSet(e.key, i, {
+                                reps: t === "" ? "" : Number(t),
+                              })
+                            }
+                            placeholder="reps"
+                          />
+                        </>
+                      ) : null}
+                      <Pressable
+                        accessibilityLabel={`Remove set ${i + 1}`}
+                        onPress={() => removeSet(e.key, i)}
+                        style={styles.ghostX}
+                      >
+                        <Body style={{ color: colors.muted }}>×</Body>
+                      </Pressable>
+                    </View>
+                  ))}
+
+                  <Button
+                    label="+ same as last"
+                    variant="line"
+                    style={{ marginTop: 10 }}
+                    onPress={() => duplicateSet(e.key)}
+                  />
+                </View>
+              ))
+            )}
+
+            {editingId || draft.exercises.length > 0 ? (
+              <Button
+                label="Delete session"
+                variant="hot"
+                style={{ marginTop: 20 }}
+                onPress={() =>
+                  Alert.alert("Delete this session?", undefined, [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Delete",
+                      style: "destructive",
+                      onPress: () => {
+                        deleteDraft();
+                        router.replace("/week");
+                      },
+                    },
+                  ])
+                }
+              />
+            ) : null}
+          </ScrollView>
+        </KeyboardAvoidingView>
 
         <BottomSheetModal
           ref={sheetRef}
@@ -318,11 +321,11 @@ export default function SessionScreen() {
           handleIndicatorStyle={{ backgroundColor: colors.muted }}
         >
           <BottomSheetScrollView
-            contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+            contentContainerStyle={{ padding: space.lg, paddingBottom: 40 }}
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.topbar}>
-              <Display style={{ fontSize: 28 }}>Exercises</Display>
+              <Display style={{ fontSize: type.displayXs }}>Exercises</Display>
               <Button
                 label="Close"
                 variant="line"
@@ -339,44 +342,18 @@ export default function SessionScreen() {
             />
             <Mini>Default style for new lifts</Mini>
             <View style={[styles.modeRow, { marginTop: 8, marginBottom: 12 }]}>
-              <Pressable
+              <Chip
+                label="Weight × reps"
+                active={newExerciseMode === "weight"}
                 onPress={() => setNewExerciseMode("weight")}
-                style={[
-                  styles.modeBtn,
-                  newExerciseMode === "weight" && styles.modeOn,
-                ]}
-              >
-                <Body
-                  style={{
-                    fontSize: 12,
-                    color:
-                      newExerciseMode === "weight"
-                        ? colors.accentInk
-                        : colors.muted,
-                  }}
-                >
-                  Weight × reps
-                </Body>
-              </Pressable>
-              <Pressable
+                style={{ flex: 1 }}
+              />
+              <Chip
+                label="Time based"
+                active={newExerciseMode === "time"}
                 onPress={() => setNewExerciseMode("time")}
-                style={[
-                  styles.modeBtn,
-                  newExerciseMode === "time" && styles.modeOn,
-                ]}
-              >
-                <Body
-                  style={{
-                    fontSize: 12,
-                    color:
-                      newExerciseMode === "time"
-                        ? colors.accentInk
-                        : colors.muted,
-                  }}
-                >
-                  Time based
-                </Body>
-              </Pressable>
+                style={{ flex: 1 }}
+              />
             </View>
 
             <Mini>Yours</Mini>
@@ -427,17 +404,19 @@ export default function SessionScreen() {
                 ))
             )}
 
-            <Button
-              label="Create from search"
-              style={{ marginTop: 14 }}
-              onPress={() => {
-                const n = query.trim();
-                if (!n) return;
-                addExercise(n, newExerciseMode);
-                sheetRef.current?.dismiss();
-                setQuery("");
-              }}
-            />
+            {canCreate ? (
+              <Button
+                label={`Create “${query.trim()}”`}
+                style={{ marginTop: 14 }}
+                onPress={() => {
+                  const n = query.trim();
+                  if (!n) return;
+                  addExercise(n, newExerciseMode);
+                  sheetRef.current?.dismiss();
+                  setQuery("");
+                }}
+              />
+            ) : null}
           </BottomSheetScrollView>
         </BottomSheetModal>
       </Screen>
@@ -478,12 +457,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 10,
   },
-  timer: { fontSize: 52, marginTop: 4 },
+  timer: { fontSize: type.timer, marginTop: 4 },
   liveRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   livePill: {
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 999,
+    borderRadius: radius.pill,
     paddingHorizontal: 9,
     paddingVertical: 4,
   },
@@ -499,31 +478,22 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   modeRow: { flexDirection: "row", gap: 6, marginTop: 8, marginBottom: 4 },
-  modeBtn: {
-    flex: 1,
-    minHeight: 36,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modeOn: {
-    backgroundColor: colors.accent,
-    borderColor: "transparent",
-  },
   setrow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     marginTop: 8,
   },
-  setN: { width: 28, textAlign: "center", fontWeight: "700" },
+  setN: {
+    width: 28,
+    textAlign: "center",
+    fontFamily: "DMSans_700Bold",
+  },
   setField: { flex: 1, paddingVertical: 11 },
   ghostX: {
     width: 44,
     height: 44,
-    borderRadius: 8,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.line,
     alignItems: "center",
@@ -532,8 +502,8 @@ const styles = StyleSheet.create({
   exRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingVertical: 12,
+    gap: space.md,
+    paddingVertical: space.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.line,
   },
