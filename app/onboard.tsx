@@ -8,9 +8,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Body, Button, Field, Screen } from "../src/components/ui";
+import { Body, Button, Display, Field, Muted, Screen } from "../src/components/ui";
 import { useWelift } from "../src/store/welift";
-import { space } from "../src/theme";
+import { space, type } from "../src/theme";
 
 export default function OnboardScreen() {
   const insets = useSafeAreaInsets();
@@ -28,7 +28,7 @@ export default function OnboardScreen() {
       style={{
         paddingTop: insets.top + 24,
         paddingBottom: insets.bottom + 16,
-        paddingHorizontal: 20,
+        paddingHorizontal: space.xl,
       }}
     >
       <KeyboardAvoidingView
@@ -36,6 +36,13 @@ export default function OnboardScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
       >
+        <View style={styles.hero}>
+          <Display style={{ fontSize: type.displayLg }}>WeLift</Display>
+          <Muted style={{ marginTop: space.sm, maxWidth: 280 }}>
+            Private lift logs you own. Share a file, not an account.
+          </Muted>
+        </View>
+
         <View style={styles.form}>
           <Body style={styles.label}>Enter your name</Body>
           <Field
@@ -51,7 +58,13 @@ export default function OnboardScreen() {
           />
         </View>
 
-        <Button label="Next" onPress={openWeek} testID="onboard-next" />
+        <Button
+          label="Next"
+          onPress={openWeek}
+          testID="onboard-next"
+          disabled={!name.trim()}
+          style={!name.trim() ? { opacity: 0.45 } : undefined}
+        />
       </KeyboardAvoidingView>
     </Screen>
   );
@@ -60,6 +73,9 @@ export default function OnboardScreen() {
 const styles = StyleSheet.create({
   avoid: {
     flex: 1,
+  },
+  hero: {
+    marginTop: space.xl,
   },
   form: {
     flex: 1,

@@ -15,7 +15,7 @@ import {
 } from "../../src/components/ui";
 import { dayKey, fmtDuration, formatSet, rollingDays } from "../../src/lib/format";
 import { dayLoad, useWelift } from "../../src/store/welift";
-import { colors } from "../../src/theme";
+import { colors, radius, space, type } from "../../src/theme";
 
 export default function WeekScreen() {
   const insets = useSafeAreaInsets();
@@ -45,9 +45,9 @@ export default function WeekScreen() {
     <Screen>
       <ScrollView
         contentContainerStyle={{
-          paddingTop: insets.top + 12,
-          paddingBottom: insets.bottom + 28,
-          paddingHorizontal: 16,
+          paddingTop: insets.top + space.md,
+          paddingBottom: space.xxl,
+          paddingHorizontal: space.lg,
         }}
         stickyHeaderIndices={[0]}
       >
@@ -61,37 +61,31 @@ export default function WeekScreen() {
               onPress={() => selectDay(todayKey)}
             />
           </View>
-          <Display style={{ fontSize: 32, marginTop: 12 }}>Your week</Display>
+          <Display style={{ fontSize: type.displaySm, marginTop: space.md }}>
+            Your week
+          </Display>
           <View style={styles.rail}>
             {days.map((d, i) => {
               const k = dayKey(d);
               const on = k === selectedDay;
               const empty = loads[i] === 0;
-              const sparkVals = [
-                0,
-                loads[i] * 0.35,
-                loads[i] * 0.7,
-                loads[i],
-              ].map((x) => Math.round(x));
               return (
                 <Pressable
                   key={k}
-                  onPress={() => {
-                    selectDay(k);
-                    openDay(k);
-                    router.push("/session");
-                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  onPress={() => selectDay(k)}
                   style={[
                     styles.day,
-                    on && styles.dayOn,
                     empty && styles.dayEmpty,
+                    on && styles.dayOn,
                   ]}
                 >
                   <Mini style={{ fontSize: 10 }}>
                     {d.toLocaleDateString(undefined, { weekday: "narrow" })}
                   </Mini>
                   <Body style={{ fontSize: 14 }}>{d.getDate()}</Body>
-                  <Sparkline values={sparkVals} />
+                  <Sparkline values={[loads[i]]} />
                 </Pressable>
               );
             })}
@@ -128,7 +122,7 @@ export default function WeekScreen() {
               ? "Today"
               : selectedDate.toLocaleDateString(undefined, { weekday: "long" })}
           </Mini>
-          <Display style={{ fontSize: 36, marginTop: 4 }}>
+          <Display style={{ fontSize: type.displayMd, marginTop: 4 }}>
             {selectedDate.toLocaleDateString(undefined, {
               month: "short",
               day: "numeric",
@@ -145,7 +139,7 @@ export default function WeekScreen() {
             }}
             style={styles.emptyDay}
           >
-            <Display style={{ fontSize: 34, color: "#6d6458" }}>
+            <Display style={{ fontSize: 34, color: colors.emptyInk }}>
               Log this day
             </Display>
           </Pressable>
@@ -193,7 +187,7 @@ export default function WeekScreen() {
 const styles = StyleSheet.create({
   railWrap: {
     backgroundColor: colors.bg,
-    paddingBottom: 8,
+    paddingBottom: space.sm,
   },
   topbar: {
     flexDirection: "row",
@@ -204,20 +198,21 @@ const styles = StyleSheet.create({
   rail: {
     flexDirection: "row",
     gap: 6,
-    marginTop: 12,
+    marginTop: space.md,
   },
   day: {
     flex: 1,
     alignItems: "center",
     gap: 4,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingVertical: space.sm,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: "transparent",
     backgroundColor: "rgba(28,25,22,0.4)",
   },
   dayOn: {
     borderColor: colors.mark,
+    borderStyle: "solid",
     backgroundColor: "rgba(196,165,116,0.12)",
   },
   dayEmpty: {
@@ -225,7 +220,7 @@ const styles = StyleSheet.create({
     borderColor: colors.dashed,
   },
   heroCard: {
-    borderRadius: 14,
+    borderRadius: radius.xl,
     padding: 14,
     marginTop: 10,
   },
@@ -246,19 +241,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderStyle: "dashed",
     borderColor: colors.line,
-    borderRadius: 14,
+    borderRadius: radius.xl,
     padding: 28,
     alignItems: "center",
     backgroundColor: "rgba(28,25,22,0.35)",
   },
   card: {
-    borderRadius: 12,
+    borderRadius: radius.lg,
     padding: 14,
     marginBottom: 10,
   },
   liftline: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 8,
+    gap: space.sm,
   },
 });

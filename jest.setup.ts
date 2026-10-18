@@ -39,6 +39,12 @@ jest.mock("expo-system-ui", () => ({
   setBackgroundColorAsync: jest.fn(async () => undefined),
 }));
 
+jest.mock("expo-haptics", () => ({
+  selectionAsync: jest.fn(async () => undefined),
+  impactAsync: jest.fn(async () => undefined),
+  ImpactFeedbackStyle: { Light: "light", Medium: "medium", Heavy: "heavy" },
+}));
+
 jest.mock("expo-status-bar", () => ({
   StatusBar: () => null,
 }));

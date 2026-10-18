@@ -6,6 +6,7 @@ import {
   DMSans_700Bold,
 } from "@expo-google-fonts/dm-sans";
 import { useFonts } from "expo-font";
+import * as Haptics from "expo-haptics";
 import {
   ActivityIndicator,
   Platform,
@@ -20,7 +21,19 @@ import {
   type ViewProps,
 } from "react-native";
 
-import { colors, space } from "../theme";
+import { colors, radius, space, type } from "../theme";
+
+function haptic(kind: "selection" | "impact") {
+  try {
+    const run =
+      kind === "selection"
+        ? Haptics.selectionAsync()
+        : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void Promise.resolve(run).catch(() => undefined);
+  } catch {
+    // Web / unsupported platforms — never surface as a LogBox toast.
+  }
+}
 
 export function useWeliftFonts() {
   return useFonts({
@@ -66,6 +79,55 @@ export function Pill({
   );
 }
 
+export function Avatar({
+  label,
+  size = 40,
+}: {
+  label: string;
+  size?: number;
+}) {
+  return (
+    <View style={[styles.avatar, { width: size, height: size, borderRadius: radius.md }]}>
+      <Body style={{ fontSize: type.mini }}>{label}</Body>
+    </View>
+  );
+}
+
+type ChipProps = PressableProps & {
+  label: string;
+  active?: boolean;
+  testID?: string;
+};
+
+export function Chip({ label, active, style, onPress, ...rest }: ChipProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: !!active }}
+      onPress={(e) => {
+        if (active == null || !active) haptic("selection");
+        onPress?.(e);
+      }}
+      style={({ pressed }) => [
+        styles.chip,
+        active && styles.chipOn,
+        pressed && Platform.OS === "ios" && { opacity: 0.88 },
+        style as object,
+      ]}
+      {...rest}
+    >
+      <Body
+        style={{
+          fontSize: type.bodySm,
+          color: active ? colors.accentInk : colors.muted,
+        }}
+      >
+        {label}
+      </Body>
+    </Pressable>
+  );
+}
+
 type BtnProps = PressableProps & {
   label: string;
   variant?: "fill" | "line" | "hot";
@@ -77,22 +139,32 @@ export function Button({
   variant = "fill",
   small,
   style,
+  onPress,
   ...rest
 }: BtnProps) {
   return (
     <Pressable
+      accessibilityRole="button"
       android_ripple={
         Platform.OS === "android"
           ? { color: "rgba(244,239,230,0.12)" }
           : undefined
       }
+      onPress={(e) => {
+        haptic("impact");
+        onPress?.(e);
+      }}
       style={({ pressed }) => [
         styles.btn,
         small && styles.btnSm,
         variant === "fill" && styles.btnFill,
         variant === "line" && styles.btnLine,
         variant === "hot" && styles.btnHot,
-        pressed && Platform.OS === "ios" && { opacity: 0.9, transform: [{ scale: 0.98 }] },
+        pressed &&
+          Platform.OS === "ios" && {
+            opacity: 0.9,
+            transform: [{ scale: 0.98 }],
+          },
         style as object,
       ]}
       {...rest}
@@ -142,37 +214,55 @@ const styles = StyleSheet.create({
   body: {
     fontFamily: "DMSans_600SemiBold",
     color: colors.ink,
-    fontSize: 15,
+    fontSize: type.body,
   },
   muted: {
     fontFamily: "DMSans_400Regular",
     color: colors.muted,
-    fontSize: 13,
+    fontSize: type.bodySm,
     lineHeight: 18,
   },
   mini: {
     fontFamily: "DMSans_600SemiBold",
     color: colors.muted,
-    fontSize: 11,
+    fontSize: type.mini,
     letterSpacing: 1,
     textTransform: "uppercase",
   },
   pill: {
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 999,
+    borderRadius: radius.pill,
     paddingHorizontal: 9,
     paddingVertical: 4,
   },
   pillText: {
     fontFamily: "DMSans_600SemiBold",
     color: colors.muted,
-    fontSize: 11,
+    fontSize: type.mini,
+  },
+  avatar: {
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.bg2,
+  },
+  chip: {
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  chipOn: {
+    backgroundColor: colors.accent,
+    borderColor: "transparent",
   },
   btn: {
     minHeight: 46,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: radius.sm,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -189,18 +279,18 @@ const styles = StyleSheet.create({
   },
   btnHot: {
     borderWidth: 1,
-    borderColor: "#5a3428",
+    borderColor: colors.hotLine,
   },
   btnLabel: {
     fontFamily: "DMSans_600SemiBold",
-    fontSize: 15,
+    fontSize: type.body,
   },
   field: {
     width: "100%",
     backgroundColor: colors.bg2,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 8,
+    borderRadius: radius.sm,
     paddingHorizontal: 14,
     paddingVertical: 13,
     color: colors.ink,
@@ -215,4 +305,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export { colors, space };
+export { colors, radius, space, type };

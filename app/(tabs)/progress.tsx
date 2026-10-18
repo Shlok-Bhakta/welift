@@ -1,10 +1,18 @@
 import { useMemo, useState } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import {
+  Platform,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { LineChart } from "react-native-gifted-charts";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
+  Avatar,
   Body,
+  Chip,
   Display,
   Mini,
   Muted,
@@ -18,7 +26,7 @@ import {
   latestBodyWeightLb,
   useWelift,
 } from "../../src/store/welift";
-import { colors } from "../../src/theme";
+import { colors, radius, space, type } from "../../src/theme";
 
 type ChartPoint = { value: number; label: string };
 
@@ -74,7 +82,13 @@ function ProgressPointChart({
   );
 }
 
-function WeightChart({ points }: { points: ChartPoint[] }) {
+function WeightChart({
+  points,
+  chartWidth,
+}: {
+  points: ChartPoint[];
+  chartWidth: number;
+}) {
   const values = points.map((p) => p.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -130,8 +144,9 @@ function WeightChart({ points }: { points: ChartPoint[] }) {
         rulesColor={colors.line}
         noOfSections={4}
         height={180}
-        width={320}
-        isAnimated={false}
+        width={chartWidth}
+        isAnimated
+        animationDuration={480}
         yAxisOffset={offset}
       />
     </View>
@@ -140,6 +155,8 @@ function WeightChart({ points }: { points: ChartPoint[] }) {
 
 export default function ProgressScreen() {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const chartWidth = Math.max(240, Math.min(360, windowWidth - 48));
   const profiles = useWelift((s) => s.profiles);
   const meId = useWelift((s) => s.meId);
   const knownMode = useWelift((s) => s.knownMode);
@@ -214,44 +231,28 @@ export default function ProgressScreen() {
     <Screen>
       <ScrollView
         contentContainerStyle={{
-          paddingTop: insets.top + 12,
-          paddingBottom: insets.bottom + 28,
-          paddingHorizontal: 16,
+          paddingTop: insets.top + space.md,
+          paddingBottom: space.xxl,
+          paddingHorizontal: space.lg,
         }}
       >
-        <Display testID="progress-heading" style={{ fontSize: 40, marginTop: 10 }}>
+        <Display testID="progress-heading" style={{ fontSize: type.displayLg, marginTop: 10 }}>
           Progress
         </Display>
 
         <View style={styles.tabRow}>
-          <Pressable
+          <Chip
             testID="progress-tab-lifts"
+            label="Lifts"
+            active={tab === "lifts"}
             onPress={() => setTab("lifts")}
-            style={[styles.tabBtn, tab === "lifts" && styles.tabOn]}
-          >
-            <Body
-              style={{
-                fontSize: 13,
-                color: tab === "lifts" ? colors.accentInk : colors.muted,
-              }}
-            >
-              Lifts
-            </Body>
-          </Pressable>
-          <Pressable
+          />
+          <Chip
             testID="progress-tab-weight"
+            label="Weight"
+            active={tab === "weight"}
             onPress={() => setTab("weight")}
-            style={[styles.tabBtn, tab === "weight" && styles.tabOn]}
-          >
-            <Body
-              style={{
-                fontSize: 13,
-                color: tab === "weight" ? colors.accentInk : colors.muted,
-              }}
-            >
-              Weight
-            </Body>
-          </Pressable>
+          />
         </View>
 
         {tab === "weight" ? (
@@ -262,29 +263,21 @@ export default function ProgressScreen() {
             {!weightPoints.length ? (
               <Muted testID="progress-weight-empty">No weigh-ins yet</Muted>
             ) : (
-              <WeightChart points={weightPoints} />
+              <WeightChart points={weightPoints} chartWidth={chartWidth} />
             )}
           </View>
         ) : (
           <>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={{ flexDirection: "row", gap: space.sm }}>
                 {sortedKeys.map(([k, n]) => (
-                  <Pressable
+                  <Chip
                     key={k}
                     testID={`progress-chip-${k}`}
+                    label={n}
+                    active={exercise === k}
                     onPress={() => setPicked(k)}
-                    style={[styles.chip, exercise === k && styles.chipOn]}
-                  >
-                    <Body
-                      style={{
-                        fontSize: 13,
-                        color: exercise === k ? colors.accentInk : colors.muted,
-                      }}
-                    >
-                      {n}
-                    </Body>
-                  </Pressable>
+                  />
                 ))}
               </View>
             </ScrollView>
@@ -299,7 +292,7 @@ export default function ProgressScreen() {
                       <View key={s.id} style={styles.webSeries}>
                         <Muted>
                           {s.name}
-                          {s.you ? " (you)" : ""}
+                          {s.you ? " · you" : ""}
                         </Muted>
                         <View style={styles.webBars}>
                           {s.points.map((pt, i) => {
@@ -349,26 +342,25 @@ export default function ProgressScreen() {
                       rulesColor={colors.line}
                       noOfSections={4}
                       height={180}
-                      width={320}
-                      isAnimated={false}
+                      width={chartWidth}
+                      isAnimated
+                      animationDuration={480}
                     />
                   </View>
                 )
               ) : null}
             </View>
 
-            <Mini style={{ marginTop: 12 }}>
+            <Mini style={{ marginTop: space.md }}>
               {mode === "time" ? "Best minutes" : "Best est. 1RM"}
             </Mini>
             {plotted.map((s) => (
               <View key={s.id} style={styles.person}>
-                <View style={styles.av}>
-                  <Body style={{ fontSize: 12 }}>{initials(s.name)}</Body>
-                </View>
+                <Avatar label={initials(s.name)} />
                 <View>
                   <Body>
                     {s.name}
-                    {s.you ? " (you)" : ""}
+                    {s.you ? " · you" : ""}
                   </Body>
                   <Muted testID={`progress-peak-${s.id}`}>
                     {s.peak}
@@ -385,37 +377,15 @@ export default function ProgressScreen() {
 }
 
 const styles = StyleSheet.create({
-  tabRow: { flexDirection: "row", gap: 8, marginTop: 12 },
-  tabBtn: {
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  tabOn: {
-    backgroundColor: colors.accent,
-    borderColor: "transparent",
-  },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  chipOn: {
-    backgroundColor: colors.accent,
-    borderColor: "transparent",
-  },
+  tabRow: { flexDirection: "row", gap: space.sm, marginTop: space.md },
   chart: {
-    marginTop: 16,
-    paddingVertical: 8,
+    marginTop: space.lg,
+    paddingVertical: space.sm,
     minHeight: 180,
   },
   pointChart: {
     flexDirection: "row",
-    gap: 8,
+    gap: space.sm,
     minHeight: 180,
   },
   pointYAxis: {
@@ -442,13 +412,13 @@ const styles = StyleSheet.create({
   pointRow: {
     flexDirection: "row",
     alignItems: "flex-end",
-    gap: 12,
-    paddingTop: 8,
+    gap: space.md,
+    paddingTop: space.sm,
   },
   pointCol: {
     flex: 1,
     alignItems: "center",
-    gap: 8,
+    gap: space.sm,
   },
   pointBarTrack: {
     width: "100%",
@@ -472,7 +442,7 @@ const styles = StyleSheet.create({
   },
   webChart: {
     gap: 14,
-    paddingVertical: 8,
+    paddingVertical: space.sm,
   },
   webSeries: { gap: 6 },
   webBars: {
@@ -489,18 +459,9 @@ const styles = StyleSheet.create({
   person: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingVertical: 12,
+    gap: space.md,
+    paddingVertical: space.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.line,
-  },
-  av: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: "center",
-    justifyContent: "center",
   },
 });
