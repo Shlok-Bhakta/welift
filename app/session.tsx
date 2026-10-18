@@ -111,7 +111,7 @@ export default function SessionScreen() {
         >
           <View style={styles.topbar}>
             <Button
-              label="Week"
+              label="Close"
               variant="line"
               small
               onPress={() => {
@@ -142,9 +142,6 @@ export default function SessionScreen() {
             })}
           </Mini>
           <Display style={styles.timer}>{fmtDuration(draft.durationSec || 0)}</Display>
-          <Muted style={{ marginTop: 4 }}>
-            Timer runs while this day is open. Everything here is editable.
-          </Muted>
 
           <Button
             label="Add exercise"
@@ -155,7 +152,6 @@ export default function SessionScreen() {
 
           {draft.exercises.length === 0 ? (
             <View style={{ marginTop: 8, gap: 8 }}>
-              <Muted>No exercises yet. Add one to start logging sets.</Muted>
               <Mini>Quick add</Mini>
               {["Deadlift", "Squat", "Bench Press"].map((name) => {
                 const key = slugify(name);
@@ -176,7 +172,6 @@ export default function SessionScreen() {
                 <View style={styles.topbar}>
                   <View style={{ flex: 1 }}>
                     <Body>{e.name}</Body>
-                    <Muted>{e.key}</Muted>
                   </View>
                   <Button
                     label="Remove"
@@ -291,11 +286,6 @@ export default function SessionScreen() {
                   style={{ marginTop: 10 }}
                   onPress={() => duplicateSet(e.key)}
                 />
-                <Muted style={{ marginTop: 6, fontSize: 12 }}>
-                  {e.mode === "time"
-                    ? "Minutes / seconds — elliptical, bike, planks."
-                    : "Weight / reps — + copies the latest set so you can bump it."}
-                </Muted>
               </View>
             ))
           )}
@@ -348,7 +338,7 @@ export default function SessionScreen() {
               style={{ marginVertical: 10 }}
             />
             <Mini>Default style for new lifts</Mini>
-            <View style={[styles.modeRow, { marginTop: 8 }]}>
+            <View style={[styles.modeRow, { marginTop: 8, marginBottom: 12 }]}>
               <Pressable
                 onPress={() => setNewExerciseMode("weight")}
                 style={[
@@ -388,9 +378,6 @@ export default function SessionScreen() {
                 </Body>
               </Pressable>
             </View>
-            <Muted style={{ marginTop: 6, marginBottom: 12 }}>
-              Once an exercise is used as weight or time, WeLift remembers it.
-            </Muted>
 
             <Mini>Yours</Mini>
             {mine.filter((x) => filter(x.name, x.key)).map((x) => (
@@ -423,16 +410,14 @@ export default function SessionScreen() {
             ))}
 
             <Mini style={{ marginTop: 14 }}>From other people</Mini>
-            {others.filter((x) => filter(x.name, x.key)).length === 0 ? (
-              <Muted>Empty</Muted>
-            ) : (
+            {others.filter((x) => filter(x.name, x.key)).length === 0 ? null : (
               others
                 .filter((x) => filter(x.name, x.key))
                 .map((x) => (
                   <ExerciseRow
                     key={x.key}
                     name={x.name}
-                    meta={`${x.key} · from ${x.from}`}
+                    meta={`from ${x.from}`}
                     mode={x.mode}
                     onPress={() => {
                       addExercise(x.name, x.mode);
@@ -475,7 +460,7 @@ function ExerciseRow({
     <Pressable
       onPress={onPress}
       style={styles.exRow}
-      testID={`exercise-row-${meta}`}
+      testID={`exercise-row-${slugify(name)}`}
     >
       <View style={{ flex: 1 }}>
         <Body>{name}</Body>

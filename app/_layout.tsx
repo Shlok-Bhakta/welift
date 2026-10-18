@@ -27,7 +27,15 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: colors.bg },
           animation: "fade",
         }}
-      />
+      >
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen
+          name="session"
+          options={{ presentation: "modal", animation: "slide_from_bottom" }}
+        />
+        <Stack.Screen name="onboard" />
+        <Stack.Screen name="index" />
+      </Stack>
     </GestureHandlerRootView>
   );
 }

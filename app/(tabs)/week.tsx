@@ -1,28 +1,21 @@
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from "react-native";
+import { useMemo } from "react";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { GlassSurface } from "../src/components/GlassSurface";
-import { Sparkline } from "../src/components/Sparkline";
+import { GlassSurface } from "../../src/components/GlassSurface";
+import { Sparkline } from "../../src/components/Sparkline";
 import {
   Body,
   Button,
   Display,
   Mini,
-  Muted,
   Pill,
   Screen,
-} from "../src/components/ui";
-import { dayKey, fmtDuration, formatSet, rollingDays } from "../src/lib/format";
-import { dayLoad, useWelift } from "../src/store/welift";
-import { colors, space } from "../src/theme";
+} from "../../src/components/ui";
+import { dayKey, fmtDuration, formatSet, rollingDays } from "../../src/lib/format";
+import { dayLoad, useWelift } from "../../src/store/welift";
+import { colors } from "../../src/theme";
 
 export default function WeekScreen() {
   const insets = useSafeAreaInsets();
@@ -32,7 +25,6 @@ export default function WeekScreen() {
   const selectDay = useWelift((s) => s.selectDay);
   const openDay = useWelift((s) => s.openDay);
   const sessionsOn = useWelift((s) => s.sessionsOn);
-  const [menu, setMenu] = useState(false);
 
   const me = meId ? profiles[meId] : null;
   const days = useMemo(() => rollingDays(), [selectedDay, profiles]);
@@ -61,15 +53,7 @@ export default function WeekScreen() {
       >
         <View style={styles.railWrap}>
           <View style={styles.topbar}>
-            <Pressable
-              onPress={() => setMenu(true)}
-              style={styles.iconBtn}
-              hitSlop={8}
-              testID="week-menu"
-            >
-              <Body style={{ fontSize: 18 }}>☰</Body>
-            </Pressable>
-            <Muted>{me.name}</Muted>
+            <Body>{me.name}</Body>
             <Button
               label="Today"
               variant="line"
@@ -77,8 +61,7 @@ export default function WeekScreen() {
               onPress={() => selectDay(todayKey)}
             />
           </View>
-          <Mini style={{ marginTop: 12 }}>Rolling 7 days</Mini>
-          <Display style={{ fontSize: 32, marginTop: 2 }}>Your week</Display>
+          <Display style={{ fontSize: 32, marginTop: 12 }}>Your week</Display>
           <View style={styles.rail}>
             {days.map((d, i) => {
               const k = dayKey(d);
@@ -117,14 +100,7 @@ export default function WeekScreen() {
 
         <GlassSurface style={styles.heroCard}>
           <View style={styles.topbar}>
-            <View>
-              <Mini>Week intensity</Mini>
-              <Body style={{ marginTop: 4 }}>
-                {total
-                  ? `${total} sets / bouts this week`
-                  : "Quiet stretch — tap a day to log"}
-              </Body>
-            </View>
+            <Body style={{ marginTop: 4 }}>{`${total} sets`}</Body>
             <Pill testID="week-active-pill">{`${loads.filter((x) => x > 0).length} active`}</Pill>
           </View>
           <View style={styles.bars}>
@@ -158,11 +134,6 @@ export default function WeekScreen() {
               day: "numeric",
             })}
           </Display>
-          <Muted style={{ marginTop: 4 }}>
-            {list.length
-              ? `${list.length} session · tap to edit anytime`
-              : "Empty day — tap here or a dashed square to log."}
-          </Muted>
         </View>
 
         {!list.length ? (
@@ -177,9 +148,6 @@ export default function WeekScreen() {
             <Display style={{ fontSize: 34, color: "#6d6458" }}>
               Log this day
             </Display>
-            <Muted style={{ textAlign: "center", marginTop: 6 }}>
-              Weight lifts, timed cardio, whatever you did.
-            </Muted>
           </Pressable>
         ) : (
           list.map((s) => {
@@ -200,13 +168,15 @@ export default function WeekScreen() {
                     <Body style={{ fontSize: 16 }}>
                       {fmtDuration(s.durationSec || 0)}
                     </Body>
-                    <Pill>{`${setCount} entries · edit`}</Pill>
+                    <Pill>{`${setCount} sets`}</Pill>
                   </View>
                   <View style={{ gap: 7, marginTop: 4 }}>
                     {s.exercises.map((e) => (
                       <View key={e.key} style={styles.liftline}>
                         <Body>{e.name}</Body>
-                        <Muted>{e.sets.map(formatSet).join(", ")}</Muted>
+                        <Body style={{ color: colors.muted }}>
+                          {e.sets.map(formatSet).join(", ")}
+                        </Body>
                       </View>
                     ))}
                   </View>
@@ -216,64 +186,7 @@ export default function WeekScreen() {
           })
         )}
       </ScrollView>
-
-      <Modal
-        visible={menu}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setMenu(false)}
-      >
-        <Pressable style={styles.scrim} onPress={() => setMenu(false)}>
-          <Pressable style={[styles.drawer, { paddingTop: insets.top + 22 }]}>
-            <Mini>WeLift</Mini>
-            <Display style={{ fontSize: 32, marginVertical: 12 }}>
-              {me.name}
-            </Display>
-            <MenuLink
-              title="Week"
-              sub="Rolling last 7 days"
-              onPress={() => setMenu(false)}
-            />
-            <MenuLink
-              title="Progress"
-              sub="You + circle"
-              testID="menu-progress"
-              onPress={() => {
-                setMenu(false);
-                router.push("/progress");
-              }}
-            />
-            <MenuLink
-              title="People & share"
-              sub=".welift import / export"
-              onPress={() => {
-                setMenu(false);
-                router.push("/people");
-              }}
-            />
-          </Pressable>
-        </Pressable>
-      </Modal>
     </Screen>
-  );
-}
-
-function MenuLink({
-  title,
-  sub,
-  onPress,
-  testID,
-}: {
-  title: string;
-  sub: string;
-  onPress: () => void;
-  testID?: string;
-}) {
-  return (
-    <Pressable onPress={onPress} style={styles.nav} testID={testID}>
-      <Body>{title}</Body>
-      <Muted style={{ marginTop: 2 }}>{sub}</Muted>
-    </Pressable>
   );
 }
 
@@ -287,16 +200,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(28,25,22,0.75)",
   },
   rail: {
     flexDirection: "row",
@@ -357,24 +260,5 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 8,
-  },
-  scrim: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    flexDirection: "row",
-  },
-  drawer: {
-    width: "80%",
-    maxWidth: 310,
-    backgroundColor: colors.bg2,
-    borderRightWidth: 1,
-    borderRightColor: colors.line,
-    paddingHorizontal: 18,
-    paddingBottom: 24,
-  },
-  nav: {
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.line,
   },
 });

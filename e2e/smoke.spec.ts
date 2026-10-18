@@ -51,7 +51,7 @@ test.describe("WeLift web smoke", () => {
     ).toBeVisible();
   });
 
-  test("menu opens people & progress", async ({ page }) => {
+  test("tabs navigate between week, people, and progress", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText("Enter your name")).toBeVisible({
       timeout: 60_000,
@@ -62,23 +62,16 @@ test.describe("WeLift web smoke", () => {
       timeout: 30_000,
     });
 
-    await page.getByText("☰").click();
-    await expect(page.getByText("People & share")).toBeVisible();
-    await page.getByText("People & share").click();
-    await expect(page.getByText("People", { exact: true })).toBeVisible();
+    await page.getByText("People", { exact: true }).click();
     await expect(page.getByText("Export", { exact: true })).toBeVisible();
     await expect(page.getByText("Import", { exact: true })).toBeVisible();
 
-    await page.getByText("Week", { exact: true }).first().click();
+    await page.getByText("Week", { exact: true }).click();
     await expect(page.getByText("Your week").first()).toBeVisible();
 
-    await page.getByText("☰").click();
-    await page.getByText("Progress", { exact: true }).first().click();
+    await page.getByText("Progress", { exact: true }).click();
     await expect(
       page.getByText("Progress", { exact: true }).first()
-    ).toBeVisible();
-    await expect(
-      page.getByText("Est. 1RM for weight lifts", { exact: false })
     ).toBeVisible();
     await expect(page.getByTestId("progress-empty")).toBeVisible();
   });
